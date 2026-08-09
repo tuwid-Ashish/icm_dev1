@@ -1,0 +1,9 @@
+ID,Batch,Subject,Text,OptionA,OptionB,OptionC,OptionD,CorrectIndex,Marks,Explanation
+GD-301,SSC GD,General Intelligence & Reasoning,"Select the related word: Doctor : Hospital :: Teacher : ?",School,Office,Court,Factory,0,2,"A doctor works in a hospital; similarly a teacher works in a school."
+GD-302,SSC GD,General Intelligence & Reasoning,"Find the missing number in the series: 3, 9, 27, 81, ?",162,243,324,108,1,2,"Multiply each term by 3 (81 × 3 = 243)."
+GD-303,SSC GD,General Knowledge & General Awareness,"Which fundamental right was removed by the 44th Constitutional Amendment Act?",Right to Equality,Right to Freedom,Right to Property,Right to Religion,2,2,"The Right to Property was removed from the list of Fundamental Rights in 1978."
+GD-304,SSC GD,General Knowledge & General Awareness,"Who was the founder of the Maurya Empire?",Ashoka,Chandragupta Maurya,Bindusara,Harsha,1,2,"Chandragupta Maurya established the Maurya Empire with the help of Chanakya."
+GD-305,SSC GD,Elementary Mathematics,"The Average of first 5 natural numbers is:",2,3,4,5,1,2,"Sum = (1+2+3+4+5) = 15; Average = 15 / 5 = 3."
+GD-306,SSC GD,Elementary Mathematics,"A item bought for Rs. 500 is sold for Rs. 600. What is the Profit Percentage?",10%,15%,20%,25%,2,2,"Profit = 100; Profit % = (100 / 500) × 100 = 20%."
+GD-307,SSC GD,English / Hindi,"Choose the correctly spelled word:",Recieve,Receive,Receve,Receeive,1,2,"The correct spelling is 'Receive'."
+GD-308,SSC GD,English / Hindi,"Antonym of the word 'ANCIENT':",Old,Modern,Historical,Past,1,2,"'Ancient' means belonging to the distant past; its antonym is 'Modern'."

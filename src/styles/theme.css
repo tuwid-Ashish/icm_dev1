@@ -1,0 +1,555 @@
+/* ==========================================================================
+   SigmaForce CEP - High-Contrast Design System & Solid Orange Navbar
+   Strict Rule: Zero Emojis / Zero Icons Anywhere in UI
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap');
+
+:root {
+    /* Base Body & Surfaces */
+    --bg-body: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-subtle: #f1f5f9;
+    --bg-hover: #e2e8f0;
+
+    /* Primary Text Palette */
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+
+    /* Primary Orange Accent */
+    --primary: #ea580c;
+    --primary-hover: #c2410c;
+    --primary-light: #fff7ed;
+    --primary-border: #fed7aa;
+
+    /* Secondary Status Colors */
+    --success: #047857;
+    --success-bg: #ecfdf5;
+    --success-border: #a7f3d0;
+
+    --warning: #b45309;
+    --warning-bg: #fffbeb;
+    --warning-border: #fde68a;
+
+    --danger: #be123c;
+    --danger-bg: #fff1f2;
+    --danger-border: #fecdd3;
+
+    --purple: #6d28d9;
+    --purple-bg: #f5f3ff;
+    --purple-border: #ddd6fe;
+
+    --indigo: #4338ca;
+    --indigo-bg: #eef2ff;
+    --indigo-border: #c7d2fe;
+
+    /* High-Contrast Card Borders & Elevated Shadows */
+    --border-color: #cbd5e1;
+    --border-strong: #94a3b8;
+
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 9999px;
+
+    --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.05);
+    --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.03);
+    --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.08), 0 3px 6px rgba(15, 23, 42, 0.04);
+
+    --font-heading: 'Outfit', sans-serif;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-body);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Solid Rounded Status Badges (White Text & Solid Rounded Pill Fill) */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: #ffffff !important;
+    line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.badge-success { background-color: #047857 !important; color: #ffffff !important; }
+.badge-danger { background-color: #be123c !important; color: #ffffff !important; }
+.badge-warning { background-color: #b45309 !important; color: #ffffff !important; }
+.badge-orange { background-color: #ea580c !important; color: #ffffff !important; }
+.badge-purple { background-color: #6d28d9 !important; color: #ffffff !important; }
+.badge-indigo { background-color: #4338ca !important; color: #ffffff !important; }
+
+/* Solid Primary Orange Top Navbar */
+.top-navbar {
+    height: 70px;
+    background: #ea580c;
+    color: #ffffff;
+    border-bottom: 1px solid #c2410c;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 14px rgba(234, 88, 12, 0.2);
+}
+
+.brand-group {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.brand-logo-text {
+    font-family: var(--font-heading);
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+}
+
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.nav-link {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    transition: all 0.15s ease;
+    padding: 0.4rem 0;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: #fff7ed;
+    font-weight: 800;
+    border-bottom: 2px solid #ffffff;
+}
+
+/* Micro-Scaling Sign Out Button */
+.btn-signout {
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    padding: 0.5rem 1.1rem;
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.btn-signout:hover {
+    transform: scale(1.05);
+    background: #020617;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Page Container */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.25rem 1.5rem;
+}
+
+/* High-Contrast Cards */
+.card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.card-title {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+/* Recruitment Board Card Grid (Uniform Height & Bottom Baseline Alignment) */
+.cards-equal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.exam-select-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.75rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.exam-select-card:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Clean Header Typography inside Exam Select Card (Fixes Text Overlap Bug) */
+.exam-card-medium {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.4rem;
+}
+
+.exam-card-title {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.35;
+    margin-bottom: 0.5rem;
+}
+
+.exam-card-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+
+/* Stats Cards Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+}
+
+.stat-val {
+    font-family: var(--font-heading);
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.stat-sub {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.4rem;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.65rem 1.35rem;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn-secondary {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-sm { padding: 0.4rem 0.85rem; font-size: 0.85rem; }
+.btn-lg { padding: 0.85rem 1.85rem; font-size: 1rem; font-weight: 700; }
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Form Controls */
+.form-group { margin-bottom: 1.25rem; }
+.form-label { display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); }
+.form-control {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+}
+.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-border); }
+
+/* CBT Simulator Layout */
+.cbt-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.cbt-topbar {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+}
+
+.cbt-timer-box {
+    background: var(--primary-light);
+    border: 2px solid var(--primary-border);
+    color: var(--primary);
+    font-family: 'Outfit', monospace;
+    font-size: 1.4rem;
+    font-weight: 800;
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cbt-timer-box.alert {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    color: var(--danger);
+}
+
+.cbt-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.25rem;
+}
+
+.cbt-q-container {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Options Cards */
+.opt-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.opt-card:hover {
+    border-color: var(--primary-border);
+    background: var(--primary-light);
+}
+
+.opt-card.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+    font-weight: 700;
+}
+
+.opt-tag {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+}
+
+.opt-card.selected .opt-tag {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Calendar-like Question Palette Sidebar */
+.cbt-palette-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.calendar-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+    margin-top: 1rem;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.cal-p-btn {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cal-p-btn.answered { background: var(--success-bg); color: var(--success); border-color: var(--success-border); }
+.cal-p-btn.visited { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+.cal-p-btn.marked { background: var(--purple-bg); color: var(--purple); border-color: var(--purple-border); }
+.cal-p-btn.answered_marked { background: var(--indigo-bg); color: var(--indigo); border-color: var(--indigo-border); }
+.cal-p-btn.not_visited { background: var(--bg-subtle); color: var(--text-muted); }
+
+.cal-p-btn.active-q {
+    border: 2px solid var(--primary) !important;
+    font-weight: 800;
+    transform: scale(1.05);
+}
+
+/* Modals */
+.modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 2rem;
+    width: 90%;
+    max-width: 580px;
+    box-shadow: var(--shadow-md);
+}
+
+/* Tables */
+.table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    background: var(--bg-surface);
+}
+
+.data-table th, .data-table td {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    background: var(--bg-subtle);
+    color: var(--text-muted);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.data-table tr:hover { background: var(--bg-subtle); }

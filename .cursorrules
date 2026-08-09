@@ -1,0 +1,9 @@
+# Cursor & Windsurf Instruction Bridge
+
+Always start by reading [.icm/START_HERE.md](file:///d:/icm_dev1/.icm/START_HERE.md).
+Follow the 3-Layered Routing Architecture:
+- Layer 1: .icm/START_HERE.md & .icm/PROGRESS.md
+- Layer 2: .icm/workspaces/[domain]/context.md
+- Layer 3: src/ & docs/
+
+Maintain persistent state by updating .icm/PROGRESS.md and .icm/MEMORY.md after every completed task.

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SigmaForce CEP - Online Mock Test & Assessment Platform</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Main Top Navigation -->
+        <header class="navbar">
+            <div class="brand-title">
+                <div class="brand-icon">⚡</div>
+                <div>
+                    <div>SigmaForce CEP</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400;">Online CBT Mock Test Platform</div>
+                </div>
+            </div>
+
+            <!-- Role Selector Tabs -->
+            <nav class="nav-tabs">
+                <button class="tab-btn active" data-tab="student">
+                    🎓 Student Portal
+                </button>
+                <button class="tab-btn" data-tab="admin">
+                    ⚙️ Admin Portal
+                </button>
+            </nav>
+
+            <!-- Current User Badge / Account Switcher -->
+            <div class="user-profile-badge" id="user-profile-badge">
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; font-size: 0.9rem;" id="nav-user-name">Alex Student</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);" id="nav-user-meta">SIGMA-2026-001</div>
+                </div>
+                <span class="role-tag" id="nav-user-role">STUDENT</span>
+                <button class="btn btn-secondary btn-sm" id="btn-account-switch" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">Switch Account</button>
+            </div>
+        </header>
+
+        <!-- Main View Router Container -->
+        <main class="main-content">
+            <!-- STUDENT VIEW -->
+            <section id="student-view" class="view-section active">
+                <!-- Dynamically rendered by StudentModule -->
+            </section>
+
+            <!-- ADMIN VIEW -->
+            <section id="admin-view" class="view-section">
+                <!-- Dynamically rendered by AdminModule -->
+            </section>
+        </main>
+    </div>
+
+    <!-- Account Switcher / Auth Modal -->
+    <div class="modal-overlay" id="auth-modal" style="display: none;">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="panel-title">🔐 Switch Account / Login</h3>
+                <button class="modal-close" id="auth-modal-close">&times;</button>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-tertiary); padding: 0.35rem; border-radius: var(--radius-md);">
+                <button class="btn btn-primary" id="auth-tab-student" style="flex: 1;">Student</button>
+                <button class="btn btn-secondary" id="auth-tab-admin" style="flex: 1;">Admin</button>
+            </div>
+
+            <form id="auth-form">
+                <input type="hidden" id="auth-role" value="student">
+                
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-control" id="auth-email" required value="student@sigma.com">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="auth-password" required value="pass123">
+                </div>
+
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+                    💡 <strong>Default Demo Accounts:</strong><br>
+                    • Student: <code>student@sigma.com</code> / <code>pass123</code> (12 tests left)<br>
+                    • Student (Limit Exhausted): <code>rahul@sigma.com</code> / <code>pass123</code> (0 left)<br>
+                    • Admin: <code>admin@sigma.com</code> / <code>admin123</code>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="submit" class="btn btn-gradient" style="width: 100%;">Sign In</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

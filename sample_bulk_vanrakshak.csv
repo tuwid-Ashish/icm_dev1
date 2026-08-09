@@ -1,0 +1,9 @@
+ID,Batch,Subject,Text,OptionA,OptionB,OptionC,OptionD,CorrectIndex,Marks,Explanation
+VR-201,Vanrakshak,Marathi,"'झाड' या शब्दाचे अनेकवचन कोणते?",झाडे,झाडांना,झाडांचे,झाडावर,0,2,"'झाड' या नपुंसकलिंगी नामाचे अनेकवचन 'झाडे' होते."
+VR-202,Vanrakshak,Marathi,"'आभाळ फाटणे' या वाक्प्रचाराचा अर्थ काय आहे?",खूप पाऊस पडणे,सर्व बाजूंनी संकट येणे,आभाळ निळे होणे,आनंद होणे,1,2,"'आभाळ फाटणे' म्हणजे सर्व बाजूंनी एकाच वेळी मोठे संकट येणे."
+VR-203,Vanrakshak,English,"Choose the correct synonym for 'ABUNDANT':",Scarce,Plentiful,Lacking,Small,1,2,"'Abundant' means existing or available in large quantities; plentiful."
+VR-204,Vanrakshak,English,"Fill in the blank: She has been studying ___ morning.",since,for,from,by,0,2,"Use 'since' with a specific point in time (morning)."
+VR-205,Vanrakshak,General Knowledge,"ताडोबा राष्ट्रीय उद्यान महाराष्ट्रातील कोणत्या जिल्ह्यात आहे?",नागपूर,चंद्रपूर,अमरावती,गडचिरोली,1,2,"ताडोबा-अंधारी व्याघ्र प्रकल्प चंद्रपूर जिल्ह्यात स्थित आहे."
+VR-206,Vanrakshak,General Knowledge,"जागतिक वन दिन कधी साजरा केला जातो?",21 मार्च,22 एप्रिल,5 जून,1 डिसेंबर,0,2,"दरवर्षी 21 मार्च हा दिवस जागतिक वन दिन (International Day of Forests) म्हणून साजरा केला जातो."
+VR-207,Vanrakshak,Intelligence Test,"जर CAT = 24 असेल, तर DOG = ?",26,27,28,29,0,2,"D(4) + O(15) + G(7) = 26."
+VR-208,Vanrakshak,Intelligence Test,"एका रांगेत रमेशचा दोन्ही बाजूंकडून 11 वा क्रमांक आहे, तर रांगेत एकूण किती मुले आहेत?",20,21,22,23,1,2,"एकूण = (11 + 11) - 1 = 21."
