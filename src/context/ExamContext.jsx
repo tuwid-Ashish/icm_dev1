@@ -78,8 +78,8 @@ export const ExamProvider = ({ children }) => {
     };
 
     // Start Practice Test
-    const startPracticeTest = (studentId, examId, subjectFilter = 'ALL') => {
-        const session = generateExamPaper(studentId, examId, subjectFilter);
+    const startPracticeTest = (studentId, examId, subjectFilter = 'ALL', count, studentInfo) => {
+        const session = generateExamPaper(studentId, examId, subjectFilter, count, studentInfo);
         if (session.error) {
             return session;
         }

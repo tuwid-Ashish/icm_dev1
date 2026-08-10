@@ -3,24 +3,10 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
     const { login } = useAuth();
-    const [email, setEmail] = useState('student@sigma.com');
-    const [password, setPassword] = useState('pass123');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-
-    const handleQuickLogin = async (demoEmail, demoPass, demoRole) => {
-        setEmail(demoEmail);
-        setPassword(demoPass);
-        setLoading(true);
-        setErrorMessage('');
-        const res = await login(demoEmail, demoPass, demoRole);
-        setLoading(false);
-        if (res.success) {
-            onLoginSuccess(res.user);
-        } else {
-            setErrorMessage(res.message || 'Login failed.');
-        }
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -63,7 +49,7 @@ export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
                             required 
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="student@sigma.com"
+                            placeholder="Enter your registered email"
                         />
                     </div>
 
@@ -88,27 +74,6 @@ export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
                         {loading ? 'Signing In...' : 'Sign In to Portal'}
                     </button>
                 </form>
-
-                {/* Demo Quick Logins */}
-                <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color)' }}>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.75rem', textAlign: 'center' }}>
-                        Demo Quick Logins
-                    </p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <button 
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleQuickLogin('student@sigma.com', 'pass123', 'student')}
-                        >
-                            Demo Student
-                        </button>
-                        <button 
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleQuickLogin('admin@sigma.com', 'admin123', 'admin')}
-                        >
-                            Demo Admin
-                        </button>
-                    </div>
-                </div>
 
                 <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                     Don't have an account?{' '}

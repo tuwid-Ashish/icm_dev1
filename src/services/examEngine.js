@@ -18,10 +18,21 @@ class ExamEngine {
         return shuffled;
     }
 
-    generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20) {
+    generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20, studentInfo = {}) {
         const exam = storageService.getExamById(examId);
         if (!exam) {
             return { error: 'Invalid exam selected.' };
+        }
+
+        // Engine-side Paywall & Quota Verification
+        const currentUser = storageService.getCurrentUser();
+        const isFree = exam.isFreeTest || false;
+
+        if (!isFree) {
+            const remaining = currentUser?.remainingTests || 0;
+            if (remaining <= 0) {
+                return { error: 'Insufficient test quota remaining. Please purchase a course package to launch mock tests.' };
+            }
         }
 
         const allQuestions = storageService.getQuestions();
@@ -67,6 +78,8 @@ class ExamEngine {
         const session = {
             id: 'SESSION-' + Date.now().toString(36).toUpperCase(),
             studentId,
+            studentName: studentInfo?.studentName || currentUser?.name || 'Student User',
+            studentEmail: studentInfo?.studentEmail || currentUser?.email || 'student@sigma.com',
             examId: exam.id,
             examName: subjectFilter !== 'ALL' ? `${exam.name} (${subjectFilter} Practice)` : exam.name,
             examCode: exam.code,
@@ -137,7 +150,7 @@ class ExamEngine {
             });
         });
 
-        const negativeDeduction = wrongCount * negativeRate * 2;
+        const negativeDeduction = wrongCount * negativeRate;
         const netScore = Math.max(0, grossScore - negativeDeduction);
         const percentage = parseFloat(((netScore / (maxScore || 1)) * 100).toFixed(1));
         const totalAttempted = correctCount + wrongCount;
@@ -150,8 +163,8 @@ class ExamEngine {
             id: 'SUB-' + Date.now().toString(36).toUpperCase(),
             sessionId: session.id,
             studentId: session.studentId,
-            studentName: currentUser?.name || 'Alex Student',
-            studentEmail: currentUser?.email || 'student@sigma.com',
+            studentName: session.studentName || currentUser?.name || 'Student User',
+            studentEmail: session.studentEmail || currentUser?.email || 'student@sigma.com',
             examId: session.examId,
             examName: session.examName,
             examCode: session.examCode,
@@ -177,7 +190,7 @@ class ExamEngine {
 }
 
 export const examEngine = new ExamEngine();
-export const generateExamPaper = (studentId, examId, subjectFilter, count) => 
-    examEngine.generatePracticeTest(studentId, examId, subjectFilter, count);
+export const generateExamPaper = (studentId, examId, subjectFilter, count, studentInfo) => 
+    examEngine.generatePracticeTest(studentId, examId, subjectFilter, count, studentInfo);
 export const evaluateSubmission = (session, timeTakenSeconds) => 
     examEngine.evaluateSubmission(session, timeTakenSeconds);

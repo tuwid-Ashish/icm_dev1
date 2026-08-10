@@ -23,9 +23,9 @@ export const AuthProvider = ({ children }) => {
         return () => unsubscribe();
     }, []);
 
-    // Login Method
+    // Login Method with expectedRole parameter
     const login = async (email, password, expectedRole = 'student') => {
-        const res = await firebaseAuthService.loginUser(email, password);
+        const res = await firebaseAuthService.loginUser(email, password, expectedRole);
         if (res.success) {
             setUser(res.user);
             storageService.setCurrentUser(res.user);
@@ -50,8 +50,17 @@ export const AuthProvider = ({ children }) => {
         storageService.setCurrentUser(null);
     };
 
-    // Refresh User State from Storage or Firestore
-    const refreshUser = () => {
+    // Refresh User State from Storage or Firestore (Async sync with fresh DB data)
+    const refreshUser = async () => {
+        const current = storageService.getCurrentUser();
+        if (current && (current.id || current.uid)) {
+            const latest = await firestoreEngine.getUserProfile(current.id || current.uid);
+            if (latest) {
+                setUser({ ...latest });
+                storageService.setCurrentUser(latest);
+                return;
+            }
+        }
         const updated = storageService.getCurrentUser();
         setUser(updated ? { ...updated } : null);
     };

@@ -14,7 +14,7 @@ import {
 import { storageService } from './storageService.js';
 
 export const firebaseAuthService = {
-    // 1. Register New Student Account (with mandatory mobile)
+    // 1. Register New Student Account (with mandatory mobile, 0 free tests initial quota)
     registerStudent: async (name, email, password, mobile) => {
         if (isFirebaseConnected && auth && db) {
             try {
@@ -31,19 +31,11 @@ export const firebaseAuthService = {
                     email,
                     mobile: mobile || '',
                     role: email === 'admin@sigma.com' ? 'admin' : 'student',
-                    allowedTests: 20,
-                    remainingTests: 20,
+                    allowedTests: 0,
+                    remainingTests: 0,
                     completedTests: 0,
                     enrollmentId,
-                    purchasedPackages: [
-                        {
-                            packageName: 'Police Batch – 100 Tests',
-                            exam: 'Police Bharti',
-                            purchaseDate: new Date().toLocaleDateString('en-IN'),
-                            expiry: '12 Months',
-                            paymentStatus: 'Paid'
-                        }
-                    ],
+                    purchasedPackages: [],
                     status: 'active',
                     createdAt: new Date().toISOString()
                 };
@@ -66,19 +58,11 @@ export const firebaseAuthService = {
             mobile: mobile || '',
             password,
             role: 'student',
-            allowedTests: 20,
-            remainingTests: 20,
+            allowedTests: 0,
+            remainingTests: 0,
             completedTests: 0,
             enrollmentId: 'SIGMA-2026-LOC',
-            purchasedPackages: [
-                {
-                    packageName: 'Police Batch – 100 Tests',
-                    exam: 'Police Bharti',
-                    purchaseDate: new Date().toLocaleDateString('en-IN'),
-                    expiry: '12 Months',
-                    paymentStatus: 'Paid'
-                }
-            ],
+            purchasedPackages: [],
             status: 'active',
             createdAt: new Date().toISOString()
         };
@@ -87,8 +71,8 @@ export const firebaseAuthService = {
         return { success: true, user: userObj };
     },
 
-    // 2. Login User
-    loginUser: async (email, password) => {
+    // 2. Login User with Strict Role Isolation
+    loginUser: async (email, password, expectedRole = 'student') => {
         if (isFirebaseConnected && auth && db) {
             try {
                 const userCred = await signInWithEmailAndPassword(auth, email, password);
@@ -96,32 +80,46 @@ export const firebaseAuthService = {
 
                 // Fetch student profile document from Firestore
                 const userDoc = await getDoc(doc(db, 'users', uid));
+                let userProfile = null;
                 if (userDoc.exists()) {
-                    const profileData = { id: userDoc.id, ...userDoc.data() };
-                    return { success: true, user: profileData };
+                    userProfile = { id: userDoc.id, ...userDoc.data() };
                 } else {
-                    const fallbackUser = {
+                    userProfile = {
                         uid,
                         id: uid,
                         name: userCred.user.displayName || email.split('@')[0],
                         email,
                         mobile: '',
-                        role: email.includes('admin') ? 'admin' : 'student',
-                        allowedTests: 20,
-                        remainingTests: 20,
+                        role: email.toLowerCase().includes('admin') ? 'admin' : 'student',
+                        allowedTests: 0,
+                        remainingTests: 0,
                         completedTests: 0,
+                        purchasedPackages: [],
                         status: 'active'
                     };
-                    return { success: true, user: fallbackUser };
                 }
+
+                if (userProfile.role !== expectedRole) {
+                    await firebaseSignOut(auth);
+                    if (expectedRole === 'student') {
+                        return { success: false, message: 'Admin accounts must log in via the dedicated /admin portal.' };
+                    } else {
+                        return { success: false, message: 'Student accounts cannot access the system administration portal.' };
+                    }
+                }
+
+                return { success: true, user: userProfile };
             } catch (err) {
                 console.error('[Firebase Auth] Login error:', err);
                 return { success: false, message: err.message };
             }
         }
 
-        // Demo Accounts Fallback
+        // Demo Accounts Fallback with Strict Role Isolation
         if (email === 'admin@sigma.com' && password === 'admin123') {
+            if (expectedRole !== 'admin') {
+                return { success: false, message: 'Admin accounts must log in via the dedicated /admin portal.' };
+            }
             const adminUser = {
                 id: 'admin_1',
                 name: 'System Administrator',
@@ -134,25 +132,20 @@ export const firebaseAuthService = {
         }
 
         if (email === 'student@sigma.com' && password === 'pass123') {
+            if (expectedRole !== 'student') {
+                return { success: false, message: 'Student accounts cannot access the system administration portal.' };
+            }
             const studentUser = {
                 id: 'std_101',
                 name: 'Alex Student',
                 email: 'student@sigma.com',
                 mobile: '9876543210',
                 role: 'student',
-                allowedTests: 20,
-                remainingTests: 12,
-                completedTests: 8,
+                allowedTests: 0,
+                remainingTests: 0,
+                completedTests: 0,
                 enrollmentId: 'SIGMA-2026-101',
-                purchasedPackages: [
-                    {
-                        packageName: 'Police Batch – 100 Tests',
-                        exam: 'Police Bharti',
-                        purchaseDate: '10/08/2026',
-                        expiry: '12 Months',
-                        paymentStatus: 'Paid'
-                    }
-                ],
+                purchasedPackages: [],
                 status: 'active'
             };
             return { success: true, user: studentUser };

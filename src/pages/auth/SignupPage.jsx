@@ -65,14 +65,15 @@ export const SignupPage = ({ onSwitchToLogin, onSignupSuccess }) => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Mobile Number * (Mandatory)</label>
+                        <label className="form-label">Mobile Number * (Mandatory - 10 Digits)</label>
                         <input 
                             type="tel" 
                             className="form-control" 
                             required 
-                            pattern="[0-9]{10,12}"
+                            maxLength={10}
+                            pattern="[0-9]{10}"
                             value={mobile}
-                            onChange={(e) => setMobile(e.target.value)}
+                            onChange={(e) => setMobile(e.target.value.replace(/[^0-9]/g, ''))}
                             placeholder="9876543210"
                         />
                     </div>

@@ -3,8 +3,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 export const AdminLoginPage = ({ onAdminLoginSuccess }) => {
     const { login } = useAuth();
-    const [email, setEmail] = useState('admin@sigma.com');
-    const [password, setPassword] = useState('admin123');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
@@ -58,7 +58,7 @@ export const AdminLoginPage = ({ onAdminLoginSuccess }) => {
                             required 
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="admin@sigma.com"
+                            placeholder="Enter administrator email"
                         />
                     </div>
 
@@ -83,10 +83,6 @@ export const AdminLoginPage = ({ onAdminLoginSuccess }) => {
                         {loading ? 'Authenticating Admin...' : 'Authenticate Admin'}
                     </button>
                 </form>
-
-                <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    Admin Credentials: <code>admin@sigma.com</code> / <code>admin123</code>
-                </div>
             </div>
         </div>
     );

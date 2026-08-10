@@ -76,39 +76,45 @@ const SEED_STUDENTS = [
         id: 'std_101',
         name: 'Alex Student',
         email: 'student@sigma.com',
+        mobile: '9876543210',
         password: 'pass123',
         enrollmentId: 'SIGMA-2026-001',
         role: 'student',
         status: 'active',
-        allowedTests: 20,
-        completedTests: 8,
-        remainingTests: 12,
+        allowedTests: 0,
+        completedTests: 0,
+        remainingTests: 0,
+        purchasedPackages: [],
         createdAt: '2026-08-01T09:00:00Z'
     },
     {
         id: 'std_102',
         name: 'Priya Sharma',
         email: 'priya@sigma.com',
+        mobile: '9876543211',
         password: 'pass123',
         enrollmentId: 'SIGMA-2026-002',
         role: 'student',
         status: 'active',
-        allowedTests: 15,
-        completedTests: 10,
-        remainingTests: 5,
+        allowedTests: 0,
+        completedTests: 0,
+        remainingTests: 0,
+        purchasedPackages: [],
         createdAt: '2026-08-02T10:30:00Z'
     },
     {
         id: 'std_103',
-        name: 'Rahul Patil (Limit Reached)',
+        name: 'Rahul Patil',
         email: 'rahul@sigma.com',
+        mobile: '9876543212',
         password: 'pass123',
         enrollmentId: 'SIGMA-2026-003',
         role: 'student',
         status: 'active',
-        allowedTests: 10,
-        completedTests: 10,
+        allowedTests: 0,
+        completedTests: 0,
         remainingTests: 0,
+        purchasedPackages: [],
         createdAt: '2026-08-03T11:15:00Z'
     }
 ];
@@ -122,10 +128,13 @@ const DEFAULT_ADMIN = {
 
 class StorageService {
     constructor() {
-        this.init();
+        if (typeof localStorage !== 'undefined') {
+            this.init();
+        }
     }
 
     init() {
+        if (typeof localStorage === 'undefined') return;
         if (!localStorage.getItem(STORAGE_KEYS.QUESTIONS)) {
             localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(SEED_QUESTIONS));
         }
@@ -134,22 +143,35 @@ class StorageService {
         }
         if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
             localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(SEED_STUDENTS));
+        } else {
+            // One-time automatic migration: reset all existing local student quotas to 0
+            const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
+            const resetList = existing.map(s => ({ ...s, allowedTests: 0, remainingTests: 0 }));
+            localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(resetList));
+            localStorage.setItem('sigma_students', JSON.stringify(resetList));
         }
         if (!localStorage.getItem(STORAGE_KEYS.SUBMISSIONS)) {
             localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify([]));
         }
         if (!localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) {
             localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(SEED_STUDENTS[0]));
+        } else {
+            const curr = JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || '{}');
+            if (curr && curr.role === 'student') {
+                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({ ...curr, allowedTests: 0, remainingTests: 0 }));
+            }
         }
     }
 
     // --- AUTH & SESSION ---
     getCurrentUser() {
+        if (typeof localStorage === 'undefined') return SEED_STUDENTS[0];
         const u = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
         return u ? JSON.parse(u) : SEED_STUDENTS[0];
     }
 
     setCurrentUser(user) {
+        if (typeof localStorage === 'undefined') return;
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     }
 
@@ -252,6 +274,7 @@ class StorageService {
 
     // --- QUESTION BANK ---
     getQuestions() {
+        if (typeof localStorage === 'undefined') return SEED_QUESTIONS;
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.QUESTIONS) || '[]');
     }
 
@@ -305,6 +328,7 @@ class StorageService {
 
     // --- EXAM BLUEPRINTS ---
     getExams() {
+        if (typeof localStorage === 'undefined') return SEED_EXAMS;
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.EXAMS) || '[]');
     }
 
@@ -343,6 +367,7 @@ class StorageService {
     }
 
     getSubmissions() {
+        if (typeof localStorage === 'undefined') return this._inMemorySubs || [];
         return JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
     }
 
@@ -357,9 +382,13 @@ class StorageService {
     saveSubmission(sub) {
         const subs = this.getSubmissions();
         if (!sub.id) sub.id = 'sub_' + Date.now();
-        sub.submittedAt = new Date().toISOString();
+        if (!sub.submittedAt) sub.submittedAt = new Date().toISOString();
         subs.unshift(sub);
-        localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(subs));
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(subs));
+        } else {
+            this._inMemorySubs = subs;
+        }
         return sub;
     }
 }
