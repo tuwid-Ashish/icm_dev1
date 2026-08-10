@@ -18,6 +18,7 @@ import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx';
 
 import './styles/theme.css';
+import './styles/components.css';
 
 const MainAppContent = () => {
     const { user, logout } = useAuth();
@@ -39,6 +40,16 @@ const MainAppContent = () => {
     }, [user]);
 
     const handleNavigate = (route) => {
+        // Guard admin dashboard
+        if (route === 'admin_dashboard' && (!user || user.role !== 'admin')) {
+            setCurrentRoute('admin_login');
+            return;
+        }
+        // Guard student protected routes
+        if ((route === 'dashboard' || route === 'exams' || route === 'history') && user && user.role === 'admin') {
+            setCurrentRoute('admin_dashboard');
+            return;
+        }
         setCurrentRoute(route);
     };
 
@@ -50,8 +61,8 @@ const MainAppContent = () => {
             />
 
             <main style={{ flex: 1 }}>
-                {/* Active CBT Test Session */}
-                {activeSession ? (
+                {/* Active CBT Test Session (Blocked for Admins) */}
+                {activeSession && user?.role === 'student' ? (
                     <div className="container">
                         <TestSimulatorPage />
                     </div>
@@ -65,22 +76,22 @@ const MainAppContent = () => {
                         {currentRoute === 'login' && <LoginPage onSwitchToSignup={() => setCurrentRoute('signup')} onLoginSuccess={() => setCurrentRoute('dashboard')} />}
                         {currentRoute === 'signup' && <SignupPage onSwitchToLogin={() => setCurrentRoute('login')} onSignupSuccess={() => setCurrentRoute('dashboard')} />}
                         
-                        {/* Student Dashboard */}
-                        {currentRoute === 'dashboard' && (
+                        {/* Student Dashboard (Requires Student Role) */}
+                        {currentRoute === 'dashboard' && user && user.role === 'student' && (
                             <div className="container">
                                 <StudentDashboardPage onNavigate={handleNavigate} />
                             </div>
                         )}
 
                         {/* Exam Catalog & Syllabus Explorer */}
-                        {currentRoute === 'exams' && (
+                        {currentRoute === 'exams' && user && user.role === 'student' && (
                             <div className="container">
                                 <ExamCatalogPage />
                             </div>
                         )}
 
                         {/* Test History & Subject Analytics */}
-                        {currentRoute === 'history' && (
+                        {currentRoute === 'history' && user && user.role === 'student' && (
                             <div className="container">
                                 <HistoryPage onViewResult={setActiveResult} />
                             </div>
@@ -88,14 +99,24 @@ const MainAppContent = () => {
 
                         {/* Isolated Admin Login */}
                         {currentRoute === 'admin_login' && (
-                            <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
+                            user && user.role === 'admin' ? (
+                                <div className="container">
+                                    <AdminDashboardPage onNavigate={handleNavigate} />
+                                </div>
+                            ) : (
+                                <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
+                            )
                         )}
 
-                        {/* Admin Portal Dashboard */}
+                        {/* Admin Portal Dashboard (Protected Admin Route) */}
                         {currentRoute === 'admin_dashboard' && (
-                            <div className="container">
-                                <AdminDashboardPage onNavigate={handleNavigate} />
-                            </div>
+                            user && user.role === 'admin' ? (
+                                <div className="container">
+                                    <AdminDashboardPage onNavigate={handleNavigate} />
+                                </div>
+                            ) : (
+                                <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
+                            )
                         )}
                     </>
                 )}
