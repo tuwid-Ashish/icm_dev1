@@ -14,8 +14,8 @@ import {
 import { storageService } from './storageService.js';
 
 export const firebaseAuthService = {
-    // 1. Register New Student Account
-    registerStudent: async (name, email, password) => {
+    // 1. Register New Student Account (with mandatory mobile)
+    registerStudent: async (name, email, password, mobile) => {
         if (isFirebaseConnected && auth && db) {
             try {
                 // Step 1: Create Auth user in Firebase Authentication
@@ -26,13 +26,24 @@ export const firebaseAuthService = {
                 const enrollmentId = 'SIGMA-2026-' + Math.floor(1000 + Math.random() * 9000);
                 const userProfile = {
                     uid,
+                    id: uid,
                     name,
                     email,
+                    mobile: mobile || '',
                     role: email === 'admin@sigma.com' ? 'admin' : 'student',
                     allowedTests: 20,
                     remainingTests: 20,
                     completedTests: 0,
                     enrollmentId,
+                    purchasedPackages: [
+                        {
+                            packageName: 'Police Batch – 100 Tests',
+                            exam: 'Police Bharti',
+                            purchaseDate: new Date().toLocaleDateString('en-IN'),
+                            expiry: '12 Months',
+                            paymentStatus: 'Paid'
+                        }
+                    ],
                     status: 'active',
                     createdAt: new Date().toISOString()
                 };
@@ -52,114 +63,146 @@ export const firebaseAuthService = {
             id: 'std_' + Date.now(),
             name,
             email,
+            mobile: mobile || '',
             password,
             role: 'student',
             allowedTests: 20,
             remainingTests: 20,
             completedTests: 0,
             enrollmentId: 'SIGMA-2026-LOC',
-            status: 'active'
+            purchasedPackages: [
+                {
+                    packageName: 'Police Batch – 100 Tests',
+                    exam: 'Police Bharti',
+                    purchaseDate: new Date().toLocaleDateString('en-IN'),
+                    expiry: '12 Months',
+                    paymentStatus: 'Paid'
+                }
+            ],
+            status: 'active',
+            createdAt: new Date().toISOString()
         };
-        storageService.saveStudent(userObj);
+
         storageService.setCurrentUser(userObj);
         return { success: true, user: userObj };
     },
 
-    // 2. Sign In User (Student or Admin)
+    // 2. Login User
     loginUser: async (email, password) => {
         if (isFirebaseConnected && auth && db) {
             try {
-                // Step 1: Authenticate with Firebase Auth
                 const userCred = await signInWithEmailAndPassword(auth, email, password);
                 const uid = userCred.user.uid;
 
-                // Step 2: Fetch User Profile from Firestore
-                const userDocRef = doc(db, 'users', uid);
-                const snap = await getDoc(userDocRef);
-
-                let userProfile;
-                if (snap.exists()) {
-                    userProfile = { id: snap.id, ...snap.data() };
+                // Fetch student profile document from Firestore
+                const userDoc = await getDoc(doc(db, 'users', uid));
+                if (userDoc.exists()) {
+                    const profileData = { id: userDoc.id, ...userDoc.data() };
+                    return { success: true, user: profileData };
                 } else {
-                    // Initialize default profile if doc missing
-                    const enrollmentId = 'SIGMA-2026-' + Math.floor(1000 + Math.random() * 9000);
-                    userProfile = {
+                    const fallbackUser = {
                         uid,
                         id: uid,
                         name: userCred.user.displayName || email.split('@')[0],
                         email,
-                        role: email === 'admin@sigma.com' ? 'admin' : 'student',
+                        mobile: '',
+                        role: email.includes('admin') ? 'admin' : 'student',
                         allowedTests: 20,
                         remainingTests: 20,
                         completedTests: 0,
-                        enrollmentId,
-                        status: 'active',
-                        createdAt: new Date().toISOString()
+                        status: 'active'
                     };
-                    await setDoc(userDocRef, userProfile);
+                    return { success: true, user: fallbackUser };
                 }
-
-                console.log('[Firebase Auth] User signed in:', userProfile.email);
-                return { success: true, user: userProfile };
             } catch (err) {
-                console.error('[Firebase Auth] Sign in error:', err.code, err.message);
-                let msg = 'Authentication failed. Please check your credentials.';
-                if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-                    msg = 'Invalid email or password.';
-                } else if (err.code === 'auth/invalid-email') {
-                    msg = 'Please enter a valid email address.';
-                }
-                return { success: false, message: msg };
+                console.error('[Firebase Auth] Login error:', err);
+                return { success: false, message: err.message };
             }
         }
 
-        // Fallback for demo testing
-        const res = storageService.login(email, password);
-        return res;
+        // Demo Accounts Fallback
+        if (email === 'admin@sigma.com' && password === 'admin123') {
+            const adminUser = {
+                id: 'admin_1',
+                name: 'System Administrator',
+                email: 'admin@sigma.com',
+                mobile: '9876543210',
+                role: 'admin',
+                status: 'active'
+            };
+            return { success: true, user: adminUser };
+        }
+
+        if (email === 'student@sigma.com' && password === 'pass123') {
+            const studentUser = {
+                id: 'std_101',
+                name: 'Alex Student',
+                email: 'student@sigma.com',
+                mobile: '9876543210',
+                role: 'student',
+                allowedTests: 20,
+                remainingTests: 12,
+                completedTests: 8,
+                enrollmentId: 'SIGMA-2026-101',
+                purchasedPackages: [
+                    {
+                        packageName: 'Police Batch – 100 Tests',
+                        exam: 'Police Bharti',
+                        purchaseDate: '10/08/2026',
+                        expiry: '12 Months',
+                        paymentStatus: 'Paid'
+                    }
+                ],
+                status: 'active'
+            };
+            return { success: true, user: studentUser };
+        }
+
+        return { success: false, message: 'Invalid email or password.' };
     },
 
-    // 3. Sign Out User
+    // 3. Sign Out
     logoutUser: async () => {
         if (isFirebaseConnected && auth) {
             try {
                 await firebaseSignOut(auth);
-            } catch (err) {
-                console.error('[Firebase Auth] Sign out error:', err);
+            } catch (e) {
+                console.warn('[Firebase Auth] Error signing out:', e);
             }
         }
         storageService.setCurrentUser(null);
     },
 
-    // 4. Subscribe Auth State Listener
-    subscribeAuthState: (onUserChanged) => {
+    // 4. Subscribe to Real-time Auth State Changes
+    subscribeAuthState: (callback) => {
         if (isFirebaseConnected && auth && db) {
-            return onAuthStateChanged(auth, async (firebaseUser) => {
-                if (firebaseUser) {
+            return onAuthStateChanged(auth, async (authUser) => {
+                if (authUser) {
                     try {
-                        const snap = await getDoc(doc(db, 'users', firebaseUser.uid));
-                        if (snap.exists()) {
-                            onUserChanged({ id: snap.id, ...snap.data() });
-                            return;
+                        const userDoc = await getDoc(doc(db, 'users', authUser.uid));
+                        if (userDoc.exists()) {
+                            callback({ id: userDoc.id, ...userDoc.data() });
+                        } else {
+                            callback({
+                                id: authUser.uid,
+                                name: authUser.displayName || authUser.email.split('@')[0],
+                                email: authUser.email,
+                                role: authUser.email.includes('admin') ? 'admin' : 'student',
+                                status: 'active'
+                            });
                         }
                     } catch (e) {
-                        console.warn('[Firebase Auth] Error loading user doc:', e);
+                        callback(null);
                     }
-                    onUserChanged({
-                        id: firebaseUser.uid,
-                        uid: firebaseUser.uid,
-                        name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
-                        email: firebaseUser.email,
-                        role: firebaseUser.email === 'admin@sigma.com' ? 'admin' : 'student',
-                        allowedTests: 20,
-                        remainingTests: 20,
-                        completedTests: 0,
-                        enrollmentId: 'SIGMA-2026-FB'
-                    });
                 } else {
-                    onUserChanged(null);
+                    callback(null);
                 }
             });
         }
+
+        // Fallback for non-Firebase environment
+        const current = storageService.getCurrentUser();
+        callback(current);
         return () => {};
     }
 };

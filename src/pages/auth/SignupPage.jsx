@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { Flame, User, Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 
 export const SignupPage = ({ onSwitchToLogin, onSignupSuccess }) => {
     const { signup } = useAuth();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
+    const [mobile, setMobile] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!mobile.trim() || mobile.trim().length < 10) {
+            setErrorMessage('Mobile Number is mandatory (minimum 10 digits).');
+            return;
+        }
+
         setLoading(true);
         setErrorMessage('');
 
-        const res = await signup(name, email, password);
+        const res = await signup(name, email, password, mobile);
         setLoading(false);
 
         if (res.success) {
@@ -29,78 +34,90 @@ export const SignupPage = ({ onSwitchToLogin, onSignupSuccess }) => {
         <div style={{ minHeight: 'calc(100vh - 72px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-body)', padding: '2rem 1.5rem' }}>
             <div style={{ width: '100%', maxWidth: '460px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-xl)', padding: '2.5rem', boxShadow: 'var(--shadow-lg)' }}>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                    <div style={{ width: '48px', height: '48px', background: 'var(--primary)', color: 'white', borderRadius: 'var(--radius-md)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.3)' }}>
-                        <Flame size={24} />
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.5px', marginBottom: '0.35rem' }}>
+                        Student Registration
                     </div>
-                    <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>Student Registration</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Create your account to start practice test papers</p>
+                    <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        Create Account
+                    </h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                        Register to access recruitment mock test packages
+                    </p>
                 </div>
 
                 {errorMessage && (
-                    <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <AlertCircle size={16} /> {errorMessage}
+                    <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+                        {errorMessage}
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
-                        <label className="form-label">Full Name</label>
-                        <div style={{ position: 'relative' }}>
-                            <User size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input 
-                                type="text" 
-                                className="form-control" 
-                                style={{ paddingLeft: '2.5rem' }}
-                                required 
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Student Full Name"
-                            />
-                        </div>
+                        <label className="form-label">Full Name *</label>
+                        <input 
+                            type="text" 
+                            className="form-control" 
+                            required 
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Rahul Patil"
+                        />
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Email Address</label>
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input 
-                                type="email" 
-                                className="form-control" 
-                                style={{ paddingLeft: '2.5rem' }}
-                                required 
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="name@sigma.com"
-                            />
-                        </div>
+                        <label className="form-label">Mobile Number * (Mandatory)</label>
+                        <input 
+                            type="tel" 
+                            className="form-control" 
+                            required 
+                            pattern="[0-9]{10,12}"
+                            value={mobile}
+                            onChange={(e) => setMobile(e.target.value)}
+                            placeholder="9876543210"
+                        />
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Password</label>
-                        <div style={{ position: 'relative' }}>
-                            <Lock size={16} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input 
-                                type="password" 
-                                className="form-control" 
-                                style={{ paddingLeft: '2.5rem' }}
-                                required 
-                                minLength={6}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="At least 6 characters"
-                            />
-                        </div>
+                        <label className="form-label">Email Address *</label>
+                        <input 
+                            type="email" 
+                            className="form-control" 
+                            required 
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="rahul@example.com"
+                        />
                     </div>
 
-                    <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: '0.5rem' }} disabled={loading}>
-                        {loading ? 'Registering Account...' : <>Register Account <ArrowRight size={18} /></>}
+                    <div className="form-group">
+                        <label className="form-label">Password *</label>
+                        <input 
+                            type="password" 
+                            className="form-control" 
+                            required 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                        />
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        className="btn btn-primary" 
+                        disabled={loading}
+                        style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem', fontSize: '1rem', fontWeight: 800 }}
+                    >
+                        {loading ? 'Creating Student Account...' : 'Register Student Account'}
                     </button>
                 </form>
 
-                <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Already have an account?{' '}
-                    <button onClick={onSwitchToLogin} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}>
-                        Sign In Instead
+                <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Already registered?{' '}
+                    <button 
+                        onClick={onSwitchToLogin}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        Sign In Now
                     </button>
                 </div>
             </div>

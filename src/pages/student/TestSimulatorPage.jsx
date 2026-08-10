@@ -11,8 +11,7 @@ export const TestSimulatorPage = () => {
         markForReview, 
         saveAndNext, 
         jumpToQuestion, 
-        submitCurrentTest,
-        setCurrentQuestionIdx
+        submitCurrentTest
     } = useExam();
 
     const [verifyModalOpen, setVerifyModalOpen] = useState(false);
@@ -21,8 +20,10 @@ export const TestSimulatorPage = () => {
         return <div className="card"><p>No active practice session found.</p></div>;
     }
 
+    const totalQs = activeSession.questions.length;
+    const isLastQuestion = currentQuestionIdx === totalQs - 1;
     const q = activeSession.questions[currentQuestionIdx];
-    const userAns = activeSession.userAnswers[q.id];
+    const userAns = activeSession.userAnswers ? activeSession.userAnswers[q.id] : undefined;
 
     // Prominent Digital Timer format (HH:MM:SS or MM:SS)
     const hours = Math.floor(timerSeconds / 3600);
@@ -42,13 +43,20 @@ export const TestSimulatorPage = () => {
     let answeredMarkedCount = 0;
 
     activeSession.questions.forEach(item => {
-        const st = activeSession.paletteStates[item.id] || 'not_visited';
+        const st = (activeSession.paletteStates && activeSession.paletteStates[item.id]) || 'not_visited';
         if (st === 'not_visited') notVisitedCount++;
         else if (st === 'visited') visitedCount++;
         else if (st === 'answered') answeredCount++;
         else if (st === 'marked') markedCount++;
         else if (st === 'answered_marked') answeredMarkedCount++;
     });
+
+    const handleSaveAndNextClick = () => {
+        saveAndNext(q.id);
+        if (isLastQuestion) {
+            setVerifyModalOpen(true);
+        }
+    };
 
     const handleConfirmSubmit = () => {
         setVerifyModalOpen(false);
@@ -75,7 +83,7 @@ export const TestSimulatorPage = () => {
                 <div className="cbt-q-container">
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700 }}>
-                            <span>Question {currentQuestionIdx + 1} of {activeSession.questions.length} ({q.subject || 'General Section'})</span>
+                            <span>Question {currentQuestionIdx + 1} of {totalQs} ({q.subject || 'General Section'})</span>
                             <span>Marks: +{q.marks || 1} | Penalty: -{activeSession.negativeMarkingRate}</span>
                         </div>
 
@@ -109,7 +117,7 @@ export const TestSimulatorPage = () => {
                             <button 
                                 className="btn btn-secondary" 
                                 disabled={currentQuestionIdx === 0}
-                                onClick={() => setCurrentQuestionIdx(prev => prev - 1)}
+                                onClick={() => jumpToQuestion(currentQuestionIdx - 1)}
                             >
                                 Previous
                             </button>
@@ -122,8 +130,8 @@ export const TestSimulatorPage = () => {
                             <button className="btn btn-secondary" style={{ borderColor: 'var(--purple-border)', color: 'var(--purple)' }} onClick={() => markForReview(q.id)}>
                                 Mark for Review
                             </button>
-                            <button className="btn btn-primary" onClick={() => saveAndNext(q.id)}>
-                                Save & Next
+                            <button className="btn btn-primary" onClick={handleSaveAndNextClick}>
+                                {isLastQuestion ? 'Save & Review Test' : 'Save & Next'}
                             </button>
                             <button className="btn btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => setVerifyModalOpen(true)}>
                                 Verify & Submit Test
@@ -136,7 +144,7 @@ export const TestSimulatorPage = () => {
                 <div className="cbt-palette-panel">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', fontWeight: 800 }}>Question Palette</h4>
-                        <span className="badge badge-orange">{answeredCount} / {activeSession.questions.length} Answered</span>
+                        <span className="badge badge-orange">{answeredCount + answeredMarkedCount} / {totalQs} Answered</span>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
@@ -160,7 +168,7 @@ export const TestSimulatorPage = () => {
                     {/* Calendar-shaped Grid */}
                     <div className="calendar-palette-grid">
                         {activeSession.questions.map((item, idx) => {
-                            const st = activeSession.paletteStates[item.id] || 'not_visited';
+                            const st = (activeSession.paletteStates && activeSession.paletteStates[item.id]) || 'not_visited';
                             const isActive = idx === currentQuestionIdx;
                             return (
                                 <button 
@@ -189,8 +197,8 @@ export const TestSimulatorPage = () => {
                         </p>
 
                         <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                            <div>Total Questions: <strong>{activeSession.questions.length}</strong></div>
-                            <div>Answered: <strong style={{ color: 'var(--success)' }}>{answeredCount}</strong></div>
+                            <div>Total Questions: <strong>{totalQs}</strong></div>
+                            <div>Answered: <strong style={{ color: 'var(--success)' }}>{answeredCount + answeredMarkedCount}</strong></div>
                             <div>Unattempted / Jumped: <strong style={{ color: 'var(--warning)' }}>{visitedCount + notVisitedCount}</strong></div>
                             <div>Marked for Review: <strong style={{ color: 'var(--purple)' }}>{markedCount + answeredMarkedCount}</strong></div>
                         </div>

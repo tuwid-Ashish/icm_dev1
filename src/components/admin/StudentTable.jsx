@@ -10,15 +10,13 @@ export const StudentTable = ({ onRefresh }) => {
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('pass123');
+    const [mobile, setMobile] = useState('');
     const [enrollmentId, setEnrollmentId] = useState('');
     const [allowedTests, setAllowedTests] = useState(20);
     const [status, setStatus] = useState('active');
 
     const loadStudents = async () => {
         setLoading(true);
-        // Load student profiles from storage or Firestore engine
-        const allStudents = await firestoreEngine.getSubmissions();
         const stdList = storageServiceGetStudents();
         setStudents(stdList);
         setLoading(false);
@@ -27,8 +25,35 @@ export const StudentTable = ({ onRefresh }) => {
     function storageServiceGetStudents() {
         const localData = localStorage.getItem('sigma_students');
         return localData ? JSON.parse(localData) : [
-            { id: 'std_101', name: 'Alex Student', email: 'student@sigma.com', enrollmentId: 'SIGMA-2026-101', allowedTests: 20, completedTests: 8, remainingTests: 12, status: 'active' },
-            { id: 'std_102', name: 'Rahul Student', email: 'rahul@sigma.com', enrollmentId: 'SIGMA-2026-102', allowedTests: 15, completedTests: 15, remainingTests: 0, status: 'active' }
+            { 
+                id: 'std_101', 
+                name: 'Alex Student', 
+                email: 'student@sigma.com', 
+                mobile: '9876543210',
+                enrollmentId: 'SIGMA-2026-101', 
+                allowedTests: 20, 
+                completedTests: 8, 
+                remainingTests: 12, 
+                purchasedPackages: [
+                    { packageName: 'Police Batch – 100 Tests', exam: 'Police Bharti', purchaseDate: '10/08/2026', expiry: '12 Months', paymentStatus: 'Paid' }
+                ],
+                status: 'active' 
+            },
+            { 
+                id: 'std_102', 
+                name: 'Rahul Patil', 
+                email: 'rahul@sigma.com', 
+                mobile: '9876543210',
+                enrollmentId: 'SIGMA-2026-102', 
+                allowedTests: 100, 
+                completedTests: 15, 
+                remainingTests: 85, 
+                purchasedPackages: [
+                    { packageName: 'Police Batch – 100 Tests', exam: 'Police Bharti', purchaseDate: '10/08/2026', expiry: '12 Months', paymentStatus: 'Paid' },
+                    { packageName: 'SSC GD – 100 Tests', exam: 'SSC GD', purchaseDate: '10/08/2026', expiry: '12 Months', paymentStatus: 'Paid' }
+                ],
+                status: 'active' 
+            }
         ];
     }
 
@@ -41,14 +66,14 @@ export const StudentTable = ({ onRefresh }) => {
         if (std) {
             setName(std.name);
             setEmail(std.email);
-            setPassword(std.password || 'pass123');
+            setMobile(std.mobile || '');
             setEnrollmentId(std.enrollmentId);
             setAllowedTests(std.allowedTests);
             setStatus(std.status);
         } else {
             setName('');
             setEmail('');
-            setPassword('pass123');
+            setMobile('');
             setEnrollmentId('SIGMA-2026-' + Math.floor(100 + Math.random() * 900));
             setAllowedTests(20);
             setStatus('active');
@@ -61,7 +86,6 @@ export const StudentTable = ({ onRefresh }) => {
         const stdId = editingStudent ? editingStudent.id : 'std_' + Date.now();
         await firestoreEngine.updateStudentQuota(stdId, allowedTests, status);
         
-        // Update local state
         const currentList = storageServiceGetStudents();
         const existingIdx = currentList.findIndex(s => s.id === stdId);
         const allowedNum = parseInt(allowedTests, 10);
@@ -71,7 +95,7 @@ export const StudentTable = ({ onRefresh }) => {
             const completed = currentList[existingIdx].completedTests || 0;
             updated = currentList.map(s => s.id === stdId ? {
                 ...s,
-                name, email, enrollmentId,
+                name, email, mobile, enrollmentId,
                 allowedTests: allowedNum,
                 remainingTests: Math.max(0, allowedNum - completed),
                 status
@@ -79,10 +103,13 @@ export const StudentTable = ({ onRefresh }) => {
         } else {
             updated = [...currentList, {
                 id: stdId,
-                name, email, enrollmentId,
+                name, email, mobile, enrollmentId,
                 allowedTests: allowedNum,
                 completedTests: 0,
                 remainingTests: allowedNum,
+                purchasedPackages: [
+                    { packageName: 'Police Batch – 100 Tests', exam: 'Police Bharti', purchaseDate: new Date().toLocaleDateString('en-IN'), expiry: '12 Months', paymentStatus: 'Paid' }
+                ],
                 status
             }];
         }
@@ -106,8 +133,8 @@ export const StudentTable = ({ onRefresh }) => {
         <div className="card">
             <div className="card-header">
                 <div>
-                    <h3 className="card-title">Student Accounts & Practice Quota Limits</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Configure allowed mock test limits per student account and manage platform access.</p>
+                    <h3 className="card-title">Student Account & Purchased Packages Management</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>View student registration details, mandatory mobile numbers, and active purchased course packages.</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => handleOpenModal(null)}>
                     Create Student Account
@@ -118,11 +145,11 @@ export const StudentTable = ({ onRefresh }) => {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Student Name & Email</th>
+                            <th>Student & Mobile</th>
                             <th>Enrollment ID</th>
+                            <th>Purchased Course Packages</th>
                             <th>Allowed Quota</th>
-                            <th>Completed</th>
-                            <th>Remaining Balance</th>
+                            <th>Remaining Tokens</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -132,11 +159,25 @@ export const StudentTable = ({ onRefresh }) => {
                             <tr key={s.id}>
                                 <td>
                                     <strong>{s.name}</strong><br />
+                                    <small style={{ color: 'var(--text-primary)', fontWeight: 700 }}>📱 {s.mobile || '9876543210'}</small><br />
                                     <small style={{ color: 'var(--text-muted)' }}>{s.email}</small>
                                 </td>
                                 <td><code>{s.enrollmentId}</code></td>
+                                <td style={{ maxWidth: '280px' }}>
+                                    {s.purchasedPackages && s.purchasedPackages.length > 0 ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                            {s.purchasedPackages.map((pkg, idx) => (
+                                                <div key={idx} style={{ background: 'var(--bg-subtle)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.8rem' }}>
+                                                    <strong>{pkg.packageName}</strong><br />
+                                                    <span style={{ color: 'var(--text-muted)' }}>Exam: {pkg.exam} | Date: {pkg.purchaseDate} | Status: <strong style={{ color: 'var(--success)' }}>{pkg.paymentStatus}</strong></span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No packages purchased</span>
+                                    )}
+                                </td>
                                 <td><strong>{s.allowedTests} Tests</strong></td>
-                                <td>{s.completedTests}</td>
                                 <td>
                                     <span className={`badge ${s.remainingTests > 0 ? 'badge-success' : 'badge-danger'}`}>
                                         {s.remainingTests} Tokens Left
@@ -149,7 +190,7 @@ export const StudentTable = ({ onRefresh }) => {
                                 </td>
                                 <td>
                                     <button className="btn btn-secondary btn-sm" onClick={() => handleOpenModal(s)}>
-                                        Adjust Limit
+                                        Edit Details
                                     </button>
                                     <button 
                                         className={`btn ${s.status === 'active' ? 'btn-danger' : 'btn-primary'} btn-sm`}
@@ -165,21 +206,25 @@ export const StudentTable = ({ onRefresh }) => {
                 </table>
             </div>
 
-            {/* Quota Modal */}
+            {/* Quota & Mobile Modal */}
             {modalOpen && (
                 <div className="modal-backdrop">
                     <div className="modal-card">
                         <div className="modal-header" style={{ marginBottom: '1.25rem' }}>
-                            <h3 className="card-title">{editingStudent ? 'Adjust Student Practice Limit' : 'Create Student Account'}</h3>
+                            <h3 className="card-title">{editingStudent ? 'Edit Student Details & Quota' : 'Create Student Account'}</h3>
                             <button className="modal-close" onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
                         </div>
                         <form onSubmit={handleSave}>
                             <div className="form-group">
-                                <label className="form-label">Full Name</label>
+                                <label className="form-label">Full Name *</label>
                                 <input type="text" className="form-control" required value={name} onChange={e => setName(e.target.value)} />
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Email Address</label>
+                                <label className="form-label">Mobile Number * (Mandatory)</label>
+                                <input type="tel" className="form-control" required value={mobile} onChange={e => setMobile(e.target.value)} placeholder="9876543210" />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Email Address *</label>
                                 <input type="email" className="form-control" required value={email} onChange={e => setEmail(e.target.value)} />
                             </div>
                             <div className="form-group">
@@ -199,7 +244,7 @@ export const StudentTable = ({ onRefresh }) => {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
                                 <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">{editingStudent ? 'Save Quota Limit' : 'Create Account'}</button>
+                                <button type="submit" className="btn btn-primary">Save Student Details</button>
                             </div>
                         </form>
                     </div>

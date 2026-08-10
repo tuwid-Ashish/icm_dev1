@@ -105,6 +105,13 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                         {exams.map(e => (
                             <div key={e.id} className="exam-select-card" onClick={() => handleOpenModal(e)}>
                                 <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                        <div className="exam-card-medium">{e.medium}</div>
+                                        <span className={`badge ${e.isFreeTest ? 'badge-success' : 'badge-orange'}`}>
+                                            {e.isFreeTest ? 'FREE TEST' : 'PAID MOCK'}
+                                        </span>
+                                    </div>
+
                                     <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
                                         {e.name}
                                     </h4>
@@ -122,7 +129,7 @@ export const StudentDashboardPage = ({ onNavigate }) => {
 
                                 {/* Action Button (Aligned at exact bottom baseline across all cards) */}
                                 <button className="btn btn-primary" style={{ width: '100%', fontWeight: 700 }}>
-                                    Configure & Launch Test
+                                    {e.isFreeTest ? 'Launch Free Test' : 'Configure & Launch Test'}
                                 </button>
                             </div>
                         ))}
@@ -212,17 +219,18 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                                     onChange={e => setSelectedSubject(e.target.value)}
                                 >
                                     <option value="ALL">All Subjects Mixed</option>
-                                    {selectedExam.subjects.map(s => (
-                                        <option key={s.id} value={s.name}>{s.name} ({s.questionsCount} Qs)</option>
+                                    {selectedExam.subjects && selectedExam.subjects.map(s => (
+                                        <option key={s.id || s.name} value={s.name}>{s.name} ({s.questionsCount} Qs)</option>
                                     ))}
                                 </select>
                             </div>
                         )}
 
                         <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+                            <div>Test Access: <strong style={{ color: selectedExam.isFreeTest ? 'var(--success)' : 'var(--primary)' }}>{selectedExam.isFreeTest ? 'FREE TEST (No Quota Required)' : 'PAID MOCK TEST'}</strong></div>
                             <div>Mode: <strong>{testMode === 'full' ? 'Official Full Mock Exam' : `Subject Practice (${selectedSubject})`}</strong></div>
                             <div>Duration: <strong>{selectedExam.durationMinutes} Minutes</strong></div>
-                            <div>Negative Marking Penalty: <strong>{selectedExam.negativeMarkingRate} per wrong answer</strong></div>
+                            <div>Negative Penalty: <strong>{selectedExam.negativeMarkingRate} per wrong answer</strong></div>
                         </div>
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>

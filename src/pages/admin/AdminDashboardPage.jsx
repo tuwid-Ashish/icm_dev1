@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { StudentTable } from '../../components/admin/StudentTable.jsx';
 import { QuestionBankManager } from '../../components/admin/QuestionBankManager.jsx';
 import { ExamConfigList } from '../../components/admin/ExamConfigList.jsx';
+import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 
 export const AdminDashboardPage = () => {
-    // Tabs: 'overview' | 'students' | 'questions' | 'exams' | 'reports'
+    // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'exams' | 'reports'
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState({
         totalStudents: 2,
-        totalQuestions: 60,
+        totalQuestions: 68,
         totalExams: 3,
+        totalPackages: 3,
         totalSubmissions: 0
     });
 
@@ -19,10 +21,14 @@ export const AdminDashboardPage = () => {
         const qList = await firestoreEngine.getQuestions('ALL');
         const eList = await firestoreEngine.getExams();
         const sList = await firestoreEngine.getSubmissions();
+        const pkgLocal = localStorage.getItem('sigma_course_packages');
+        const pkgCount = pkgLocal ? JSON.parse(pkgLocal).length : 3;
+
         setStats({
             totalStudents: 2,
             totalQuestions: qList.length,
             totalExams: eList.length,
+            totalPackages: pkgCount,
             totalSubmissions: sList.length
         });
     };
@@ -39,7 +45,7 @@ export const AdminDashboardPage = () => {
                     Administrative Control Panel & Governance
                 </h1>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.2rem' }}>
-                    Manage student test quota limits, question bank solutions, examination blueprints, and submission audit logs.
+                    Manage student test quota limits, course packages, question bank solutions, examination blueprints, and submission audit logs.
                 </p>
             </div>
 
@@ -49,13 +55,19 @@ export const AdminDashboardPage = () => {
                     className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('overview')}
                 >
-                    Overview & Executive Summary
+                    Overview Summary
                 </button>
                 <button 
                     className={`btn ${activeTab === 'students' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('students')}
                 >
-                    Student Accounts & Quotas
+                    Student Accounts & Packages
+                </button>
+                <button 
+                    className={`btn ${activeTab === 'packages' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('packages')}
+                >
+                    Course Packages
                 </button>
                 <button 
                     className={`btn ${activeTab === 'questions' ? 'btn-primary' : 'btn-secondary'}`}
@@ -73,7 +85,7 @@ export const AdminDashboardPage = () => {
                     className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('reports')}
                 >
-                    System Submission Reports
+                    Submission Reports
                 </button>
             </div>
 
@@ -84,25 +96,25 @@ export const AdminDashboardPage = () => {
                         <div className="stat-card" onClick={() => setActiveTab('students')} style={{ cursor: 'pointer' }}>
                             <div className="stat-title">Registered Students</div>
                             <div className="stat-val">{stats.totalStudents}</div>
-                            <div className="stat-sub">Quota Limit Control</div>
+                            <div className="stat-sub">Mobile & Purchased Packages</div>
+                        </div>
+
+                        <div className="stat-card" onClick={() => setActiveTab('packages')} style={{ cursor: 'pointer' }}>
+                            <div className="stat-title">Course Packages</div>
+                            <div className="stat-val" style={{ color: 'var(--success)' }}>{stats.totalPackages}</div>
+                            <div className="stat-sub">Active Test Bundles & Pricing</div>
                         </div>
 
                         <div className="stat-card" onClick={() => setActiveTab('questions')} style={{ cursor: 'pointer' }}>
                             <div className="stat-title">Central Question Pool</div>
                             <div className="stat-val" style={{ color: 'var(--primary)' }}>{stats.totalQuestions}</div>
-                            <div className="stat-sub">Bilingual Qs with Solutions</div>
+                            <div className="stat-sub">Multi-Select Batch Checkboxes</div>
                         </div>
 
                         <div className="stat-card" onClick={() => setActiveTab('exams')} style={{ cursor: 'pointer' }}>
                             <div className="stat-title">Exam Blueprints</div>
                             <div className="stat-val" style={{ color: 'var(--purple)' }}>{stats.totalExams}</div>
-                            <div className="stat-sub">Active Recruitment Patterns</div>
-                        </div>
-
-                        <div className="stat-card" onClick={() => setActiveTab('reports')} style={{ cursor: 'pointer' }}>
-                            <div className="stat-title">Evaluated Submissions</div>
-                            <div className="stat-val" style={{ color: 'var(--success)' }}>{stats.totalSubmissions}</div>
-                            <div className="stat-sub">Completed Test Scorecards</div>
+                            <div className="stat-sub">Subject-wise Question Allocations</div>
                         </div>
                     </div>
 
@@ -112,27 +124,27 @@ export const AdminDashboardPage = () => {
                                 <h3 className="card-title">Quick Administrative Actions</h3>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                                <button className="btn btn-primary" onClick={() => setActiveTab('questions')}>
-                                    Bulk Import Questions from Google Sheets CSV
-                                </button>
-                                <button className="btn btn-secondary" onClick={() => setActiveTab('students')}>
-                                    Adjust Student Practice Test Limits (allowedTests)
+                                <button className="btn btn-primary" onClick={() => setActiveTab('packages')}>
+                                    + Create New Course Package (e.g. Police 100 Tests)
                                 </button>
                                 <button className="btn btn-secondary" onClick={() => setActiveTab('exams')}>
-                                    Create New Recruitment Exam Type
+                                    Configure Subject-wise Question Distribution
+                                </button>
+                                <button className="btn btn-secondary" onClick={() => setActiveTab('questions')}>
+                                    Add Question with Multi-Select Batches
                                 </button>
                             </div>
                         </div>
 
                         <div className="card">
                             <div className="card-header">
-                                <h3 className="card-title">System Status & Database Integration</h3>
+                                <h3 className="card-title">System Architecture Status</h3>
                             </div>
                             <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 <div>Cloud Firestore Status: <strong style={{ color: 'var(--success)' }}>CONNECTED</strong></div>
-                                <div>Firebase Admin SDK: <strong style={{ color: 'var(--success)' }}>ACTIVE</strong></div>
-                                <div>Security Rules Bypass: <strong style={{ color: 'var(--primary)' }}>SERVICE ACCOUNT / SECURED</strong></div>
-                                <div>Active Recruitment Patterns: <strong>Police Bharti, Forest Guard, SSC GD</strong></div>
+                                <div>Subject Distribution Engine: <strong style={{ color: 'var(--success)' }}>VALIDATED</strong></div>
+                                <div>Multi-Select Batch Checkboxes: <strong style={{ color: 'var(--success)' }}>ACTIVE</strong></div>
+                                <div>Mandatory Mobile Registration: <strong style={{ color: 'var(--primary)' }}>ENFORCED</strong></div>
                             </div>
                         </div>
                     </div>
@@ -140,6 +152,7 @@ export const AdminDashboardPage = () => {
             )}
 
             {activeTab === 'students' && <StudentTable onRefresh={loadStats} />}
+            {activeTab === 'packages' && <PackageManager onRefresh={loadStats} />}
             {activeTab === 'questions' && <QuestionBankManager onRefresh={loadStats} />}
             {activeTab === 'exams' && <ExamConfigList />}
             {activeTab === 'reports' && <SystemReportsPage />}

@@ -33,9 +33,9 @@ export const AuthProvider = ({ children }) => {
         return res;
     };
 
-    // Signup Method
-    const signup = async (name, email, password) => {
-        const res = await firebaseAuthService.registerStudent(name, email, password);
+    // Signup Method (with mandatory mobile)
+    const signup = async (name, email, password, mobile) => {
+        const res = await firebaseAuthService.registerStudent(name, email, password, mobile);
         if (res.success) {
             setUser(res.user);
             storageService.setCurrentUser(res.user);
