@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { BulkUploadModal } from './BulkUploadModal.jsx';
+import { Modal } from '../common/Modal.jsx';
 
 export const QuestionBankManager = ({ onRefresh }) => {
     const [questions, setQuestions] = useState([]);
@@ -179,7 +180,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                             <th>Correct Option</th>
                             <th>Marks</th>
                             <th>Detailed Solution Explanation</th>
-                            <th>Action</th>
+                            <th style={{ minWidth: '120px', whiteSpace: 'nowrap' }}>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -201,7 +202,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                                     <td><span className="badge badge-success">{q.options ? q.options[q.correctIndex] : ''}</span></td>
                                     <td><strong>{q.marks || 1} M</strong></td>
                                     <td style={{ maxWidth: '220px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{q.explanation}</td>
-                                    <td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>
                                         <button className="btn btn-secondary btn-sm" onClick={() => handleOpenEditModal(q)}>
                                             Edit
                                         </button>
@@ -219,99 +220,96 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 onRefresh={loadQuestions}
             />
 
-            {/* Single Question Editor Modal with Multi-select Checkboxes */}
-            {editModalOpen && (
-                <div className="modal-backdrop">
-                    <div className="modal-card" style={{ maxWidth: '680px' }}>
-                        <div className="modal-header" style={{ marginBottom: '1.25rem' }}>
-                            <h3 className="card-title">{editingQ ? 'Edit Question & Solution' : 'Add New Question & Solution'}</h3>
-                            <button className="modal-close" onClick={() => setEditModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
-                        </div>
-                        <form onSubmit={handleSaveQuestion}>
-                            {/* Multi-select Batch Checkboxes */}
-                            <div className="form-group" style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                                <label className="form-label" style={{ marginBottom: '0.5rem' }}>Applicable Exam Batches (Check all that apply)</label>
-                                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={isAllBatches} 
-                                            onChange={() => handleBatchToggle('ALL')}
-                                        />
-                                        All Batches
-                                    </label>
-                                    {availableBatches.map(b => (
-                                        <label key={b} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={isAllBatches || selectedBatches.includes(b)} 
-                                                disabled={isAllBatches}
-                                                onChange={() => handleBatchToggle(b)}
-                                            />
-                                            {b}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Subject</label>
-                                <input type="text" className="form-control" required value={qSubject} onChange={e => setQSubject(e.target.value)} placeholder="e.g. Mathematics, Reasoning, General Knowledge, Marathi" />
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Question Text (Marathi / English)</label>
-                                <textarea className="form-control" required style={{ minHeight: '80px' }} value={qText} onChange={e => setQText(e.target.value)} />
-                            </div>
-
-                            <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                                    <label className="form-label">Option A</label>
-                                    <input type="text" className="form-control" required value={optA} onChange={e => setOptA(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="form-label">Option B</label>
-                                    <input type="text" className="form-control" required value={optB} onChange={e => setOptB(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="form-label">Option C</label>
-                                    <input type="text" className="form-control" required value={optC} onChange={e => setOptC(e.target.value)} />
-                                </div>
-                                <div>
-                                    <label className="form-label">Option D</label>
-                                    <input type="text" className="form-control" required value={optD} onChange={e => setOptD(e.target.value)} />
-                                </div>
-                            </div>
-
-                            <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                                    <label className="form-label">Correct Answer</label>
-                                    <select className="form-control" value={correctIdx} onChange={e => setCorrectIdx(e.target.value)}>
-                                        <option value="0">Option A</option>
-                                        <option value="1">Option B</option>
-                                        <option value="2">Option C</option>
-                                        <option value="3">Option D</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="form-label">Marks Weight</label>
-                                    <input type="number" className="form-control" step="0.5" min="1" max="5" value={marks} onChange={e => setMarks(e.target.value)} />
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label className="form-label">Detailed Solution Explanation (Shown to Student in Scorecard)</label>
-                                <textarea className="form-control" style={{ minHeight: '80px' }} value={explanation} onChange={e => setExplanation(e.target.value)} placeholder="Provide step-by-step solution rationale..." />
-                            </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-                                <button type="button" className="btn btn-secondary" onClick={() => setEditModalOpen(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Save Question</button>
-                            </div>
-                        </form>
+            {/* Single Question Editor Modal */}
+            <Modal
+                isOpen={editModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                title={editingQ ? 'Edit Question & Solution' : 'Add New Question & Solution'}
+                maxWidth="680px"
+                onSubmit={handleSaveQuestion}
+                footer={
+                    <>
+                        <button type="button" className="btn btn-secondary" onClick={() => setEditModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="btn btn-primary">Save Question</button>
+                    </>
+                }
+            >
+                {/* Multi-select Batch Checkboxes */}
+                <div className="form-group" style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                    <label className="form-label" style={{ marginBottom: '0.5rem' }}>Applicable Exam Batches (Check all that apply)</label>
+                    <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                            <input 
+                                type="checkbox" 
+                                checked={isAllBatches} 
+                                onChange={() => handleBatchToggle('ALL')}
+                            />
+                            All Batches
+                        </label>
+                        {availableBatches.map(b => (
+                            <label key={b} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={isAllBatches || selectedBatches.includes(b)} 
+                                    disabled={isAllBatches}
+                                    onChange={() => handleBatchToggle(b)}
+                                />
+                                {b}
+                            </label>
+                        ))}
                     </div>
                 </div>
-            )}
+
+                <div className="form-group">
+                    <label className="form-label">Subject</label>
+                    <input type="text" className="form-control" required value={qSubject} onChange={e => setQSubject(e.target.value)} placeholder="e.g. Mathematics, Reasoning, General Knowledge, Marathi" />
+                </div>
+
+                <div className="form-group">
+                    <label className="form-label">Question Text (Marathi / English)</label>
+                    <textarea className="form-control" required style={{ minHeight: '80px' }} value={qText} onChange={e => setQText(e.target.value)} />
+                </div>
+
+                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                        <label className="form-label">Option A</label>
+                        <input type="text" className="form-control" required value={optA} onChange={e => setOptA(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="form-label">Option B</label>
+                        <input type="text" className="form-control" required value={optB} onChange={e => setOptB(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="form-label">Option C</label>
+                        <input type="text" className="form-control" required value={optC} onChange={e => setOptC(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="form-label">Option D</label>
+                        <input type="text" className="form-control" required value={optD} onChange={e => setOptD(e.target.value)} />
+                    </div>
+                </div>
+
+                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                        <label className="form-label">Correct Answer</label>
+                        <select className="form-control" value={correctIdx} onChange={e => setCorrectIdx(e.target.value)}>
+                            <option value="0">Option A</option>
+                            <option value="1">Option B</option>
+                            <option value="2">Option C</option>
+                            <option value="3">Option D</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="form-label">Marks Weight</label>
+                        <input type="number" className="form-control" step="0.5" min="1" max="5" value={marks} onChange={e => setMarks(e.target.value)} />
+                    </div>
+                </div>
+
+                <div className="form-group">
+                    <label className="form-label">Detailed Solution Explanation (Shown to Student in Scorecard)</label>
+                    <textarea className="form-control" style={{ minHeight: '80px' }} value={explanation} onChange={e => setExplanation(e.target.value)} placeholder="Provide step-by-step solution rationale..." />
+                </div>
+            </Modal>
         </div>
     );
 };

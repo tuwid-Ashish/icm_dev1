@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useExam } from '../../context/ExamContext.jsx';
+import { Modal } from '../../components/common/Modal.jsx';
 
 export const ExamCatalogPage = () => {
     const { user } = useAuth();
@@ -40,8 +41,11 @@ export const ExamCatalogPage = () => {
         if (!selectedExam) return;
         setModalOpen(false);
         const subj = testMode === 'subject' ? selectedSubject : 'ALL';
-        const res = startPracticeTest(user?.id || 'std_101', selectedExam.id, subj);
-        if (res.error) alert(res.error);
+        const studentId = user?.id || user?.uid || 'std_101';
+        const studentName = user?.name || 'Student User';
+        const studentEmail = user?.email || 'student@sigma.com';
+        const res = startPracticeTest(studentId, selectedExam.id, subj, undefined, { studentName, studentEmail });
+        if (res?.error) alert(res.error);
     };
 
     // Syllabus Topic Coverage Data per Exam
@@ -84,6 +88,11 @@ export const ExamCatalogPage = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     {exams.map(e => {
                         const syllabus = syllabusDetails[e.id] || [];
+                        const isAccessible = e.isFreeTest || (
+                            (user?.remainingTests || 0) > 0 && 
+                            ((user?.purchasedPackages || []).length === 0 || (user?.purchasedPackages || []).some(p => p.exam === e.name || p.exam === e.code || e.name.includes(p.exam)))
+                        );
+
                         return (
                             <div key={e.id} className="card">
                                 <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
@@ -96,11 +105,11 @@ export const ExamCatalogPage = () => {
                                     </div>
 
                                     <button 
-                                        className="btn btn-primary btn-lg"
-                                        disabled={user?.remainingTests <= 0}
+                                        className={`btn ${!isAccessible ? 'btn-secondary' : 'btn-primary'} btn-lg`}
+                                        disabled={!isAccessible}
                                         onClick={() => handleOpenModal(e)}
                                     >
-                                        Configure & Launch Paper
+                                        {!isAccessible ? ((user?.remainingTests || 0) <= 0 ? 'Quota Exhausted (Purchase Package)' : 'Package Purchase Required') : 'Configure & Launch Paper'}
                                     </button>
                                 </div>
 
@@ -151,61 +160,60 @@ export const ExamCatalogPage = () => {
                 </div>
             )}
 
-            {/* Modal */}
-            {modalOpen && selectedExam && (
-                <div className="modal-backdrop">
-                    <div className="modal-card">
-                        <div className="modal-header" style={{ marginBottom: '1.25rem' }}>
-                            <h3 className="card-title">Configure Practice Test: {selectedExam.name}</h3>
-                            <button className="modal-close" onClick={() => setModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
-                        </div>
-
-                        <div className="form-group">
-                            <label className="form-label">Select Practice Mode</label>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                                <button 
-                                    className={`btn ${testMode === 'full' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setTestMode('full')}
-                                >
-                                    Full Mock Blueprint
-                                </button>
-                                <button 
-                                    className={`btn ${testMode === 'subject' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={() => setTestMode('subject')}
-                                >
-                                    Random Subject Practice
-                                </button>
-                            </div>
-                        </div>
-
-                        {testMode === 'subject' && (
-                            <div className="form-group">
-                                <label className="form-label">Select Subject Section</label>
-                                <select 
-                                    className="form-control"
-                                    value={selectedSubject}
-                                    onChange={e => setSelectedSubject(e.target.value)}
-                                >
-                                    <option value="ALL">All Subjects Mixed</option>
-                                    {selectedExam.subjects.map(s => (
-                                        <option key={s.id} value={s.name}>{s.name} ({s.questionsCount} Qs)</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                            <div>Mode: <strong>{testMode === 'full' ? 'Official Full Mock Exam' : `Subject Practice (${selectedSubject})`}</strong></div>
-                            <div>Duration: <strong>{selectedExam.durationMinutes} Minutes</strong></div>
-                            <div>Negative Penalty: <strong>{selectedExam.negativeMarkingRate} per wrong answer</strong></div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            {/* Practice Test Configuration Modal */}
+            {selectedExam && (
+                <Modal
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    title={`Configure Practice Test: ${selectedExam.name}`}
+                    maxWidth="600px"
+                    footer={
+                        <>
                             <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleLaunchTest}>Start Examination</button>
+                        </>
+                    }
+                >
+                    <div className="form-group">
+                        <label className="form-label">Select Practice Mode</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <button 
+                                className={`btn ${testMode === 'full' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setTestMode('full')}
+                            >
+                                Full Mock Blueprint
+                            </button>
+                            <button 
+                                className={`btn ${testMode === 'subject' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setTestMode('subject')}
+                            >
+                                Random Subject Practice
+                            </button>
                         </div>
                     </div>
-                </div>
+
+                    {testMode === 'subject' && (
+                        <div className="form-group">
+                            <label className="form-label">Select Subject Section</label>
+                            <select 
+                                className="form-control"
+                                value={selectedSubject}
+                                onChange={e => setSelectedSubject(e.target.value)}
+                            >
+                                <option value="ALL">All Subjects Mixed</option>
+                                {selectedExam.subjects && selectedExam.subjects.map(s => (
+                                    <option key={s.id || s.name} value={s.name}>{s.name} ({s.questionsCount} Qs)</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
+                        <div>Mode: <strong>{testMode === 'full' ? 'Official Full Mock Exam' : `Subject Practice (${selectedSubject})`}</strong></div>
+                        <div>Duration: <strong>{selectedExam.durationMinutes} Minutes</strong></div>
+                        <div>Negative Penalty: <strong>{selectedExam.negativeMarkingRate} per wrong answer</strong></div>
+                    </div>
+                </Modal>
             )}
         </div>
     );

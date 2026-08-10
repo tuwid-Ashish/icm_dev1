@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useExam } from '../../context/ExamContext.jsx';
+import { Modal } from '../../components/common/Modal.jsx';
 
 export const TestSimulatorPage = () => {
     const { 
@@ -185,31 +186,29 @@ export const TestSimulatorPage = () => {
             </div>
 
             {/* Verification Dialog Modal */}
-            {verifyModalOpen && (
-                <div className="modal-backdrop">
-                    <div className="modal-card">
-                        <div className="modal-header" style={{ marginBottom: '1rem' }}>
-                            <h3 className="card-title">Confirm Test Verification & Submission</h3>
-                        </div>
+            <Modal
+                isOpen={verifyModalOpen}
+                onClose={() => setVerifyModalOpen(false)}
+                title="Confirm Test Verification & Submission"
+                maxWidth="540px"
+                footer={
+                    <>
+                        <button className="btn btn-secondary" onClick={() => setVerifyModalOpen(false)}>Return to Test</button>
+                        <button className="btn btn-danger" onClick={handleConfirmSubmit}>Finalize & Submit</button>
+                    </>
+                }
+            >
+                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                    Are you sure you want to finalize and submit your test paper?
+                </p>
 
-                        <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                            Are you sure you want to finalize and submit your test paper?
-                        </p>
-
-                        <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                            <div>Total Questions: <strong>{totalQs}</strong></div>
-                            <div>Answered: <strong style={{ color: 'var(--success)' }}>{answeredCount + answeredMarkedCount}</strong></div>
-                            <div>Unattempted / Jumped: <strong style={{ color: 'var(--warning)' }}>{visitedCount + notVisitedCount}</strong></div>
-                            <div>Marked for Review: <strong style={{ color: 'var(--purple)' }}>{markedCount + answeredMarkedCount}</strong></div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                            <button className="btn btn-secondary" onClick={() => setVerifyModalOpen(false)}>Return to Test</button>
-                            <button className="btn btn-danger" onClick={handleConfirmSubmit}>Finalize & Submit</button>
-                        </div>
-                    </div>
+                <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <div>Total Questions: <strong>{totalQs}</strong></div>
+                    <div>Answered: <strong style={{ color: 'var(--success)' }}>{answeredCount + answeredMarkedCount}</strong></div>
+                    <div>Unattempted / Jumped: <strong style={{ color: 'var(--warning)' }}>{visitedCount + notVisitedCount}</strong></div>
+                    <div>Marked for Review: <strong style={{ color: 'var(--purple)' }}>{markedCount + answeredMarkedCount}</strong></div>
                 </div>
-            )}
+            </Modal>
         </div>
     );
 };

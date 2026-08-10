@@ -1,140 +1,176 @@
 import React, { useState } from 'react';
+import { parseCSVQuestions } from '../../services/csvParserService.js';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
+import { Modal } from '../common/Modal.jsx';
 
 export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
-    const [csvContent, setCsvContent] = useState('');
-    const [selectedFileName, setSelectedFileName] = useState('');
-    const [uploading, setUploading] = useState(false);
-    const [statusMsg, setStatusMsg] = useState('');
+    const [rawText, setRawText] = useState('');
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [isParsing, setIsParsing] = useState(false);
+    const [parsedPreview, setParsedPreview] = useState(null);
+    const [validationError, setValidationError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     if (!isOpen) return null;
-
-    const sampleCsv = `ID,Batch,Subject,Text,OptionA,OptionB,OptionC,OptionD,CorrectIndex,Marks,Explanation
-PB-101,Police Bharti,Mathematics,"150 च्या 40% चे मूल्य किती आहे?",50,60,70,80,1,1,"150 × 40 / 100 = 60."
-VR-201,Vanrakshak,Marathi,"'झाड' या शब्दाचे अनेकवचन कोणते?",झाडे,झाडांना,झाडांचे,झाडावर,0,2,"'झाड' या नपुंसकलिंगी नामाचे अनेकवचन 'झाडे' होते."`;
 
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        setSelectedFileName(file.name);
-
+        setSelectedFile(file);
         const reader = new FileReader();
-        reader.onload = (event) => {
-            setCsvContent(event.target.result);
-            setStatusMsg(`Loaded ${file.name} (${event.target.result.split('\n').length - 1} rows)`);
+        reader.onload = (evt) => {
+            setRawText(evt.target.result);
         };
         reader.readAsText(file);
     };
 
-    const handleUpload = async () => {
-        if (!csvContent.trim()) {
-            alert('Please select a .csv file or paste valid CSV content from Google Sheets.');
+    const handleParsePreview = () => {
+        setValidationError('');
+        setSuccessMessage('');
+        if (!rawText.trim()) {
+            setValidationError('Please paste CSV content or upload a CSV file.');
             return;
         }
 
-        setUploading(true);
-        setStatusMsg('Parsing CSV content...');
+        setIsParsing(true);
+        const questions = parseCSVQuestions(rawText);
+        setIsParsing(false);
 
-        try {
-            const lines = csvContent.split('\n').filter(l => l.trim().length > 0);
-            if (lines.length <= 1) {
-                alert('CSV must contain a header row and at least one data row.');
-                setUploading(false);
-                return;
-            }
-
-            const questionsToAdd = [];
-            // Skip header row
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i];
-                const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-                if (parts && parts.length >= 8) {
-                    const clean = parts.map(p => p.replace(/^"|"$/g, '').trim());
-                    questionsToAdd.push({
-                        id: clean[0] || 'Q-' + (Date.now() + i),
-                        batch: clean[1] || 'Police Bharti',
-                        subject: clean[2] || 'General Knowledge',
-                        text: clean[3] || '',
-                        options: [clean[4] || '', clean[5] || '', clean[6] || '', clean[7] || ''],
-                        correctIndex: parseInt(clean[8], 10) || 0,
-                        marks: parseFloat(clean[9]) || 1,
-                        explanation: clean[10] || `Correct answer is option ${clean[8] || 'A'}`
-                    });
-                }
-            }
-
-            setStatusMsg(`Uploading ${questionsToAdd.length} questions to Cloud Firestore...`);
-            for (const q of questionsToAdd) {
-                await firestoreEngine.saveQuestion(q);
-            }
-
-            setStatusMsg(`Successfully imported ${questionsToAdd.length} questions!`);
-            setTimeout(() => {
-                setUploading(false);
-                onClose();
-                if (onRefresh) onRefresh();
-            }, 1000);
-
-        } catch (err) {
-            console.error('CSV Import Error:', err);
-            alert('Failed to parse and upload CSV: ' + err.message);
-            setUploading(false);
+        if (questions.length === 0) {
+            setValidationError('No valid question rows found in the provided CSV text.');
+            setParsedPreview(null);
+        } else {
+            setParsedPreview(questions);
         }
     };
 
+    const handleConfirmImport = async () => {
+        if (!parsedPreview || parsedPreview.length === 0) return;
+
+        setIsParsing(true);
+        let importedCount = 0;
+
+        for (const qData of parsedPreview) {
+            await firestoreEngine.saveQuestion(qData);
+            importedCount++;
+        }
+
+        setIsParsing(false);
+        setSuccessMessage(`Successfully imported ${importedCount} questions into Question Bank!`);
+        setParsedPreview(null);
+        setRawText('');
+        setSelectedFile(null);
+        
+        setTimeout(() => {
+            if (onRefresh) onRefresh();
+            onClose();
+        }, 1800);
+    };
+
     return (
-        <div className="modal-backdrop">
-            <div className="modal-card" style={{ maxWidth: '680px' }}>
-                <div className="modal-header" style={{ marginBottom: '1rem' }}>
-                    <h3 className="card-title">Google Sheets CSV Bulk Importer</h3>
-                    <button className="modal-close" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
-                </div>
-
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                    Select a <code>.csv</code> file from your computer or paste raw CSV rows exported from Google Sheets.
-                </p>
-
-                {/* File Upload Trigger */}
-                <div className="form-group" style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px border-dashed var(--border-color)', marginBottom: '1rem', textAlign: 'center' }}>
-                    <label className="form-label" style={{ marginBottom: '0.5rem' }}>Select CSV File from Computer</label>
-                    <input 
-                        type="file" 
-                        accept=".csv" 
-                        onChange={handleFileSelect}
-                        style={{ fontSize: '0.85rem' }}
-                    />
-                    {selectedFileName && (
-                        <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: 'var(--success)', fontWeight: 700 }}>
-                            Selected File: {selectedFileName}
-                        </div>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Bulk Import Questions from Google Sheets CSV"
+            subtitle="Paste raw CSV rows or pick a .csv file from your computer."
+            maxWidth="780px"
+            footer={
+                <>
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                    {!parsedPreview ? (
+                        <button type="button" className="btn btn-primary" onClick={handleParsePreview} disabled={isParsing}>
+                            {isParsing ? 'Validating CSV...' : 'Parse & Validate CSV'}
+                        </button>
+                    ) : (
+                        <button type="button" className="btn btn-primary" onClick={handleConfirmImport} disabled={isParsing}>
+                            {isParsing ? 'Importing...' : `Confirm & Save ${parsedPreview.length} Questions`}
+                        </button>
                     )}
+                </>
+            }
+        >
+            {validationError && (
+                <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
+                    {validationError}
                 </div>
+            )}
 
-                <div className="form-group">
-                    <label className="form-label">Or Paste CSV Content Directly Below</label>
-                    <textarea 
-                        className="form-control"
-                        rows="6"
-                        style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}
-                        placeholder="Paste CSV rows here..."
-                        value={csvContent}
-                        onChange={e => setCsvContent(e.target.value)}
-                    />
+            {successMessage && (
+                <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
+                    {successMessage}
                 </div>
+            )}
 
-                {statusMsg && (
-                    <div style={{ color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
-                        {statusMsg}
+            {!parsedPreview ? (
+                <div>
+                    {/* File Upload Box */}
+                    <div className="form-group" style={{ border: '2px dashed var(--border-color)', padding: '1.25rem', borderRadius: 'var(--radius-md)', textAlign: 'center', background: 'var(--bg-subtle)' }}>
+                        <label className="form-label" style={{ marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 700 }}>
+                            Option A: Pick a CSV File (.csv)
+                        </label>
+                        <input 
+                            type="file" 
+                            accept=".csv" 
+                            onChange={handleFileSelect}
+                            style={{ display: 'block', margin: '0 auto', fontSize: '0.85rem' }}
+                        />
+                        {selectedFile && (
+                            <div style={{ marginTop: '0.5rem', color: 'var(--success)', fontSize: '0.8rem', fontWeight: 700 }}>
+                                Loaded file: {selectedFile.name}
+                            </div>
+                        )}
                     </div>
-                )}
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                    <button className="btn btn-secondary" onClick={onClose} disabled={uploading}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleUpload} disabled={uploading}>
-                        {uploading ? 'Importing...' : 'Bulk Import to Firestore'}
-                    </button>
+                    <div className="form-group">
+                        <label className="form-label">Option B: Or Paste CSV Rows Directly</label>
+                        <textarea 
+                            className="form-control"
+                            style={{ minHeight: '140px', fontFamily: 'monospace', fontSize: '0.8rem' }}
+                            placeholder={`batch,subject,text,optionA,optionB,optionC,optionD,correctIndex,marks,explanation\n"Police Bharti","Mathematics","15 + 25 = ?","35","40","45","50",1,1,"15 + 25 equals 40."`}
+                            value={rawText}
+                            onChange={e => setRawText(e.target.value)}
+                        />
+                    </div>
+
+                    <div style={{ background: 'var(--bg-subtle)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <strong>Expected Header Columns:</strong> <code>id, batch, subject, questionText, optionA, optionB, optionC, optionD, correctOption, marks</code>
+                    </div>
                 </div>
-            </div>
-        </div>
+            ) : (
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>Validation Passed: Previewing {parsedPreview.length} Questions</h4>
+                        <span className="badge badge-success">{parsedPreview.length} Ready to Import</span>
+                    </div>
+
+                    <div className="table-wrapper" style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Batch</th>
+                                    <th>Subject</th>
+                                    <th>Question Text</th>
+                                    <th>Options (A/B/C/D)</th>
+                                    <th>Correct</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {parsedPreview.map((q, idx) => (
+                                    <tr key={idx}>
+                                        <td>{idx + 1}</td>
+                                        <td><span className="badge badge-purple">{q.batch}</span></td>
+                                        <td><strong>{q.subject}</strong></td>
+                                        <td style={{ maxWidth: '220px' }}>{q.text}</td>
+                                        <td><small>{q.options.join(' | ')}</small></td>
+                                        <td><span className="badge badge-success">Opt {String.fromCharCode(65 + q.correctIndex)}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </Modal>
     );
 };

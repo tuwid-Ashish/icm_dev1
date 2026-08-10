@@ -5,18 +5,15 @@ export const SystemReportsPage = () => {
     const [submissions, setSubmissions] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const loadSubmissions = async () => {
+        setLoading(true);
+        const loaded = await firestoreEngine.getSubmissions();
+        setSubmissions(loaded);
+        setLoading(false);
+    };
+
     useEffect(() => {
-        let isMounted = true;
-        async function loadSubmissions() {
-            setLoading(true);
-            const loaded = await firestoreEngine.getSubmissions();
-            if (isMounted) {
-                setSubmissions(loaded);
-                setLoading(false);
-            }
-        }
         loadSubmissions();
-        return () => { isMounted = false; };
     }, []);
 
     // Helper to get actual student name instead of raw Firestore/Auth UID
@@ -28,7 +25,6 @@ export const SystemReportsPage = () => {
             const namePart = sub.studentEmail.split('@')[0];
             return namePart.charAt(0).toUpperCase() + namePart.slice(1).replace(/[._-]/g, ' ');
         }
-        // Known fallback map
         const knownStudents = {
             'std_101': 'Alex Student',
             'std_102': 'Rahul Student',
@@ -42,11 +38,14 @@ export const SystemReportsPage = () => {
 
     return (
         <div className="card">
-            <div className="card-header">
+            <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h3 className="card-title">System-Wide Test Submission Audit Log</h3>
+                    <h3 className="card-title">System-Wide Test Submission Audit Log ({submissions.length} Total Attempts)</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Complete audit record of all evaluated practice tests submitted by students.</p>
                 </div>
+                <button className="btn btn-secondary" onClick={loadSubmissions}>
+                    ↻ Refresh Audit Log
+                </button>
             </div>
 
             <div className="table-wrapper">
