@@ -12,7 +12,7 @@ export const TestResultPage = ({ result, onBack }) => {
                         <span className={`badge ${result.passed ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.85rem', padding: '0.35rem 0.85rem', marginBottom: '0.5rem' }}>
                             {result.passed ? 'QUALIFIED / PASSED' : 'NEEDS IMPROVEMENT'}
                         </span>
-                        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '2.8rem', fontWeight: 800, color: result.passed ? 'var(--success)' : 'var(--danger)', lineHeight: 1.1 }}>
+                        <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.75rem, 6vw, 2.8rem)', fontWeight: 800, color: result.passed ? 'var(--success)' : 'var(--danger)', lineHeight: 1.1 }}>
                             {result.finalScore} / {result.totalMarks} Marks
                         </h1>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', marginTop: '0.35rem' }}>
@@ -76,7 +76,7 @@ export const TestResultPage = ({ result, onBack }) => {
                                 {q.text}
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
                                 <div>Your Answer: <strong style={{ color: q.isCorrect ? 'var(--success)' : q.userAnswerIndex !== null ? 'var(--danger)' : 'var(--text-muted)' }}>{q.userAnswerIndex !== null ? q.options[q.userAnswerIndex] : 'Not Attempted'}</strong></div>
                                 <div>Correct Answer: <strong style={{ color: 'var(--success)' }}>{q.options[q.correctIndex]}</strong></div>
                             </div>

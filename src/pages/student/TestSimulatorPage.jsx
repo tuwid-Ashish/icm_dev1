@@ -114,27 +114,28 @@ export const TestSimulatorPage = () => {
 
                     {/* Action Bar */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.75rem' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: '240px' }}>
                             <button 
                                 className="btn btn-secondary" 
+                                style={{ flex: 1, minWidth: '100px' }}
                                 disabled={currentQuestionIdx === 0}
                                 onClick={() => jumpToQuestion(currentQuestionIdx - 1)}
                             >
                                 Previous
                             </button>
-                            <button className="btn btn-secondary" onClick={() => clearAnswer(q.id)}>
+                            <button className="btn btn-secondary" style={{ flex: 1, minWidth: '110px' }} onClick={() => clearAnswer(q.id)}>
                                 Clear Choice
                             </button>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn btn-secondary" style={{ borderColor: 'var(--purple-border)', color: 'var(--purple)' }} onClick={() => markForReview(q.id)}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: '280px' }}>
+                            <button className="btn btn-secondary" style={{ flex: 1, minWidth: '130px', borderColor: 'var(--purple-border)', color: 'var(--purple)' }} onClick={() => markForReview(q.id)}>
                                 Mark for Review
                             </button>
-                            <button className="btn btn-primary" onClick={handleSaveAndNextClick}>
-                                {isLastQuestion ? 'Save & Review Test' : 'Save & Next'}
+                            <button className="btn btn-primary" style={{ flex: 1, minWidth: '130px' }} onClick={handleSaveAndNextClick}>
+                                {isLastQuestion ? 'Save & Review' : 'Save & Next'}
                             </button>
-                            <button className="btn btn-danger" style={{ marginLeft: '0.5rem' }} onClick={() => setVerifyModalOpen(true)}>
+                            <button className="btn btn-danger" style={{ width: '100%', marginTop: '0.25rem' }} onClick={() => setVerifyModalOpen(true)}>
                                 Verify & Submit Test
                             </button>
                         </div>

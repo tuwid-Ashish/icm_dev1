@@ -81,7 +81,7 @@ export const StudentTable = ({ onRefresh }) => {
 
     return (
         <div className="card">
-            <div className="card-header">
+            <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                     <h3 className="card-title">Registered Students & Purchased Packages ({students.length} Accounts)</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Manage all registered student accounts, mandatory mobile numbers, and active purchased course packages.</p>

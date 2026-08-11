@@ -138,7 +138,7 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                 </div>
             ) : (
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>Validation Passed: Previewing {parsedPreview.length} Questions</h4>
                         <span className="badge badge-success">{parsedPreview.length} Ready to Import</span>
                     </div>

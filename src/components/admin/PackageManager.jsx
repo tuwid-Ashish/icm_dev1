@@ -180,7 +180,7 @@ export const PackageManager = ({ onRefresh }) => {
                         </div>
                     )}
 
-                    <form onSubmit={handleSavePaymentSettings} style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '2rem' }}>
+                    <form onSubmit={handleSavePaymentSettings} className="two-col-grid-responsive">
                         <div>
                             <div className="form-group">
                                 <label className="form-label">Merchant Business Name</label>

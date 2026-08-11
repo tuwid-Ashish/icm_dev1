@@ -50,7 +50,7 @@ export const AdminDashboardPage = () => {
             </div>
 
             {/* Navigation Tabs Bar */}
-            <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-surface)', padding: '0.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', marginBottom: '1.75rem', flexWrap: 'wrap', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="scrollable-tabs-bar">
                 <button 
                     className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('overview')}
@@ -118,7 +118,7 @@ export const AdminDashboardPage = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
                         <div className="card">
                             <div className="card-header">
                                 <h3 className="card-title">Quick Administrative Actions</h3>

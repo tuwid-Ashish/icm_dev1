@@ -106,6 +106,7 @@ export const ExamCatalogPage = () => {
 
                                     <button 
                                         className={`btn ${!isAccessible ? 'btn-secondary' : 'btn-primary'} btn-lg`}
+                                        style={{ minWidth: '220px' }}
                                         disabled={!isAccessible}
                                         onClick={() => handleOpenModal(e)}
                                     >
@@ -114,7 +115,7 @@ export const ExamCatalogPage = () => {
                                 </div>
 
                                 {/* Examination Key Metrics Grid */}
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
                                     <div>Duration: <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{e.durationMinutes} Mins</strong></div>
                                     <div>Total Questions: <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{e.totalQuestions} Qs</strong></div>
                                     <div>Total Marks: <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{e.totalMarks} M</strong></div>

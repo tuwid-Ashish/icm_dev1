@@ -199,7 +199,7 @@ export const ExamConfigList = ({ onRefresh }) => {
                     </>
                 }
             >
-                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group form-grid-2col">
                     <div>
                         <label className="form-label">Exam Code</label>
                         <input type="text" className="form-control" required value={code} onChange={e => setCode(e.target.value)} />
@@ -210,7 +210,7 @@ export const ExamConfigList = ({ onRefresh }) => {
                     </div>
                 </div>
 
-                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group form-grid-2col">
                     <div>
                         <label className="form-label">Language Medium</label>
                         <input type="text" className="form-control" required value={medium} onChange={e => setMedium(e.target.value)} />
@@ -224,7 +224,7 @@ export const ExamConfigList = ({ onRefresh }) => {
                     </div>
                 </div>
 
-                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div className="form-group form-grid-3col">
                     <div>
                         <label className="form-label">Duration (Minutes)</label>
                         <input type="number" className="form-control" required min="10" max="300" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} />
@@ -246,7 +246,7 @@ export const ExamConfigList = ({ onRefresh }) => {
 
                 {/* Subject-wise Question Selection Panel */}
                 <div className="form-group" style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                         <div>
                             <h4 style={{ fontSize: '0.95rem', fontWeight: 800 }}>Subject-wise Question Breakdown</h4>
                             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Specify exact question count per subject module.</p>
@@ -257,7 +257,7 @@ export const ExamConfigList = ({ onRefresh }) => {
                     </div>
 
                     {subjectBreakdown.map((sb, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 40px', gap: '0.75rem', alignItems: 'center', marginBottom: '0.6rem' }}>
+                        <div key={idx} className="subject-row-grid">
                             <input 
                                 type="text" 
                                 className="form-control" 

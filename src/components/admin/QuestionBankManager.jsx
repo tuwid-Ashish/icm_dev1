@@ -150,7 +150,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 <input 
                     type="text" 
                     className="form-control" 
-                    style={{ maxWidth: '350px' }}
+                    style={{ flex: 1, minWidth: '220px' }}
                     placeholder="Search question text, ID or subject..." 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
@@ -160,7 +160,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                     className="form-control" 
                     value={batchFilter}
                     onChange={e => setBatchFilter(e.target.value)}
-                    style={{ maxWidth: '240px' }}
+                    style={{ flex: 1, minWidth: '200px' }}
                 >
                     <option value="ALL">All Exam Batches</option>
                     <option value="Police Bharti">Police Bharti</option>
@@ -270,7 +270,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                     <textarea className="form-control" required style={{ minHeight: '80px' }} value={qText} onChange={e => setQText(e.target.value)} />
                 </div>
 
-                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group form-grid-2col">
                     <div>
                         <label className="form-label">Option A</label>
                         <input type="text" className="form-control" required value={optA} onChange={e => setOptA(e.target.value)} />
@@ -289,7 +289,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                     </div>
                 </div>
 
-                <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group form-grid-2col">
                     <div>
                         <label className="form-label">Correct Answer</label>
                         <select className="form-control" value={correctIdx} onChange={e => setCorrectIdx(e.target.value)}>

@@ -115,12 +115,12 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
             ) : (
                 <>
                     {/* Package Summary Header Card */}
-                    <div style={{ background: 'var(--bg-subtle)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ background: 'var(--bg-subtle)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                         <div>
                             <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{pkg.name}</strong><br />
                             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Exam: {pkg.exam} | Quota: {pkg.totalTests} Tests</span>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
+                        <div>
                             <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--success)' }}>₹{amountToPay}</div>
                             {pkg.discountPrice && pkg.discountPrice < pkg.price && (
                                 <small style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>₹{pkg.price}</small>
@@ -146,8 +146,8 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                         <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700 }}>
                             {paymentConfig.merchantName}
                         </div>
-                        <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
-                            Merchant UPI ID: <code style={{ background: 'var(--bg-subtle)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontWeight: 800, color: 'var(--primary)' }}>{paymentConfig.upiId}</code>
+                        <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', wordBreak: 'break-all' }}>
+                            Merchant UPI ID: <code style={{ background: 'var(--bg-subtle)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontWeight: 800, color: 'var(--primary)', wordBreak: 'break-all' }}>{paymentConfig.upiId}</code>
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                             Pay exact amount: <strong style={{ color: 'var(--success)' }}>₹{amountToPay}</strong>

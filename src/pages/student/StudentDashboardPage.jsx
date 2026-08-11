@@ -192,7 +192,7 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                                             {e.description || 'Full length online CBT practice test series.'}
                                         </p>
 
-                                        <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                                        <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
                                             <div>Duration: <strong>{e.durationMinutes} Mins</strong></div>
                                             <div>Questions: <strong>{e.totalQuestions} Qs</strong></div>
                                             <div>Total Marks: <strong>{e.totalMarks} M</strong></div>
@@ -272,15 +272,17 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                 >
                     <div className="form-group">
                         <label className="form-label">Select Practice Mode</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                             <button 
                                 className={`btn ${testMode === 'full' ? 'btn-primary' : 'btn-secondary'}`}
+                                style={{ flex: 1, minWidth: '140px' }}
                                 onClick={() => setTestMode('full')}
                             >
                                 Full Mock Blueprint
                             </button>
                             <button 
                                 className={`btn ${testMode === 'subject' ? 'btn-primary' : 'btn-secondary'}`}
+                                style={{ flex: 1, minWidth: '140px' }}
                                 onClick={() => setTestMode('subject')}
                             >
                                 Random Subject Practice

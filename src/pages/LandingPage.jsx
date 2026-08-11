@@ -7,22 +7,22 @@ export const LandingPage = ({ onNavigate }) => {
     return (
         <div>
             {/* Hero Section */}
-            <section style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)', padding: '5.5rem 1.5rem', textAlign: 'center' }}>
+            <section style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-color)', padding: '3.5rem 1.25rem', textAlign: 'center' }}>
                 <div style={{ maxWidth: '920px', margin: '0 auto' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--primary)', marginBottom: '1.25rem' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--primary)', marginBottom: '1rem' }}>
                         Maharashtra State Recruitment Assessment Engine
                     </div>
-                    <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '3.3rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.15, marginBottom: '1.25rem' }}>
+                    <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(1.75rem, 5vw, 3.3rem)', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.18, marginBottom: '1.25rem' }}>
                         Engineered for Maharashtra Competitive Exam Aspirants
                     </h1>
-                    <p style={{ fontSize: '1.15rem', color: 'var(--text-muted)', marginBottom: '2.25rem', lineHeight: 1.6, maxWidth: '800px', margin: '0 auto 2.25rem auto' }}>
+                    <p style={{ fontSize: 'clamp(0.95rem, 2.5vw, 1.15rem)', color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.6, maxWidth: '800px', margin: '0 auto 2rem auto' }}>
                         Simulate authentic Computer-Based Tests (CBT) for Police Bharti, Forest Guard (Vanrakshak), and SSC GD with real-time countdown timers, negative marking evaluation, and bilingual Marathi & English question papers.
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                        <button className="btn btn-primary btn-lg" style={{ padding: '0.9rem 2.25rem', fontSize: '1.05rem', fontWeight: 800 }} onClick={() => onNavigate('signup')}>
+                        <button className="btn btn-primary btn-lg" style={{ padding: '0.85rem 2rem', fontSize: '1rem', fontWeight: 800, minWidth: '220px' }} onClick={() => onNavigate('signup')}>
                             Get Started Free
                         </button>
-                        <button className="btn btn-secondary btn-lg" style={{ padding: '0.9rem 2.25rem', fontSize: '1.05rem', fontWeight: 700 }} onClick={() => onNavigate('login')}>
+                        <button className="btn btn-secondary btn-lg" style={{ padding: '0.85rem 2rem', fontSize: '1rem', fontWeight: 700, minWidth: '220px' }} onClick={() => onNavigate('login')}>
                             Sign In to Portal
                         </button>
                     </div>
