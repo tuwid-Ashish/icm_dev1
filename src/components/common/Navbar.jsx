@@ -1,11 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 export const Navbar = ({ activeRoute, onNavigate }) => {
     const { user, logout } = useAuth();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
     const handleNavClick = (route) => {
         onNavigate(route);
+        closeMobileMenu();
+    };
+
+    const handleLogout = () => {
+        logout();
+        closeMobileMenu();
     };
 
     return (
@@ -15,6 +24,18 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                 <div className="brand-group" onClick={() => handleNavClick('home')}>
                     <div className="brand-logo-text">SigmaForce CEP</div>
                 </div>
+
+                <button
+                    type="button"
+                    className="nav-mobile-toggle"
+                    aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                    aria-expanded={isMobileMenuOpen}
+                    onClick={() => setIsMobileMenuOpen((current) => !current)}
+                >
+                    <span className="nav-mobile-toggle-line" />
+                    <span className="nav-mobile-toggle-line" />
+                    <span className="nav-mobile-toggle-line" />
+                </button>
 
                 {/* Desktop Navigation Links */}
                 {user && (
@@ -60,7 +81,7 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                             <span className="user-name-text">
                                 {user.name} <span className="user-role-tag">({user.role === 'admin' ? 'Admin' : `${user.remainingTests || 0} Tests`})</span>
                             </span>
-                            <button className="btn-signout" onClick={logout}>
+                            <button className="btn-signout" onClick={handleLogout}>
                                 Sign Out
                             </button>
                         </div>
@@ -85,42 +106,71 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                 </div>
             </div>
 
-            {/* Mobile Sub-Navigation Strip (Only for Logged-In Users) */}
-            {user && (
-                <div className="mobile-subnav-bar">
-                    {user.role === 'student' && (
-                        <>
-                            <button 
-                                className={`subnav-link ${activeRoute === 'dashboard' ? 'active' : ''}`}
-                                onClick={() => handleNavClick('dashboard')}
-                            >
-                                Dashboard
-                            </button>
-                            <button 
-                                className={`subnav-link ${activeRoute === 'exams' ? 'active' : ''}`}
-                                onClick={() => handleNavClick('exams')}
-                            >
-                                Exam Catalog
-                            </button>
-                            <button 
-                                className={`subnav-link ${activeRoute === 'history' ? 'active' : ''}`}
-                                onClick={() => handleNavClick('history')}
-                            >
-                                Test History
-                            </button>
-                        </>
-                    )}
+            <div className={`mobile-menu-panel ${isMobileMenuOpen ? 'open' : ''}`}>
+                {user ? (
+                    <>
+                        <div className="mobile-menu-user-card">
+                            <div className="user-name-text">
+                                {user.name}
+                            </div>
+                            <div className="user-role-tag">{user.role === 'admin' ? 'Admin' : `${user.remainingTests || 0} Tests`}</div>
+                        </div>
 
-                    {user.role === 'admin' && (
-                        <button 
-                            className={`subnav-link ${activeRoute === 'admin_dashboard' ? 'active' : ''}`}
-                            onClick={() => handleNavClick('admin_dashboard')}
-                        >
-                            Admin Portal
+                        <div className="mobile-menu-links">
+                            {user.role === 'student' && (
+                                <>
+                                    <button
+                                        className={`mobile-menu-link ${activeRoute === 'dashboard' ? 'active' : ''}`}
+                                        onClick={() => handleNavClick('dashboard')}
+                                    >
+                                        Dashboard
+                                    </button>
+                                    <button
+                                        className={`mobile-menu-link ${activeRoute === 'exams' ? 'active' : ''}`}
+                                        onClick={() => handleNavClick('exams')}
+                                    >
+                                        Exam Catalog
+                                    </button>
+                                    <button
+                                        className={`mobile-menu-link ${activeRoute === 'history' ? 'active' : ''}`}
+                                        onClick={() => handleNavClick('history')}
+                                    >
+                                        Test History
+                                    </button>
+                                </>
+                            )}
+
+                            {user.role === 'admin' && (
+                                <button
+                                    className={`mobile-menu-link ${activeRoute === 'admin_dashboard' ? 'active' : ''}`}
+                                    onClick={() => handleNavClick('admin_dashboard')}
+                                >
+                                    Admin Portal
+                                </button>
+                            )}
+                        </div>
+
+                        <button className="mobile-menu-signout" onClick={handleLogout}>
+                            Sign Out
                         </button>
-                    )}
-                </div>
-            )}
+                    </>
+                ) : (
+                    <div className="mobile-menu-links mobile-menu-auth-actions">
+                        <button
+                            className="mobile-menu-link mobile-menu-auth-primary"
+                            onClick={() => handleNavClick('login')}
+                        >
+                            Sign In
+                        </button>
+                        <button
+                            className="mobile-menu-link mobile-menu-auth-secondary"
+                            onClick={() => handleNavClick('signup')}
+                        >
+                            Get Started
+                        </button>
+                    </div>
+                )}
+            </div>
         </header>
     );
 };
