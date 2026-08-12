@@ -604,7 +604,16 @@ export const firestoreEngine = {
     // 15. Admin Merchant Payment Settings (Razorpay Key ID & UPI Config)
     getMerchantPaymentSettings: async () => {
         const envKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RAZORPAY_KEY_ID) ? import.meta.env.VITE_RAZORPAY_KEY_ID : '';
-        const defaultKey = envKey || 'rzp_test_sigmaforce2026';
+        
+        const resolveKey = (adminSavedKey) => {
+            if (adminSavedKey && adminSavedKey.trim() && adminSavedKey.trim() !== 'rzp_test_sigmaforce2026') {
+                return adminSavedKey.trim();
+            }
+            if (envKey && envKey.trim() && envKey.trim() !== 'rzp_test_sigmaforce2026') {
+                return envKey.trim();
+            }
+            return adminSavedKey?.trim() || envKey?.trim() || 'rzp_test_sigmaforce2026';
+        };
 
         if (isFirebaseConnected && db) {
             try {
@@ -612,10 +621,11 @@ export const firestoreEngine = {
                 if (snap.exists()) {
                     const data = snap.data();
                     return {
-                        merchantName: 'SigmaForce CEP Official',
-                        upiId: 'sigmaforce@upi',
-                        razorpayKeyId: envKey || data.razorpayKeyId || 'rzp_test_sigmaforce2026',
-                        ...data
+                        merchantName: data.merchantName || 'SigmaForce CEP Official',
+                        upiId: data.upiId || 'sigmaforce@upi',
+                        qrImageUrl: data.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR`,
+                        ...data,
+                        razorpayKeyId: resolveKey(data.razorpayKeyId)
                     };
                 }
             } catch (e) {
@@ -627,8 +637,8 @@ export const firestoreEngine = {
         return {
             merchantName: parsed?.merchantName || 'SigmaForce CEP Official',
             upiId: parsed?.upiId || 'sigmaforce@upi',
-            razorpayKeyId: envKey || parsed?.razorpayKeyId || defaultKey,
-            qrImageUrl: parsed?.qrImageUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR'
+            qrImageUrl: parsed?.qrImageUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR',
+            razorpayKeyId: resolveKey(parsed?.razorpayKeyId)
         };
     },
 

@@ -18,7 +18,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     const [paymentConfig, setPaymentConfig] = useState({
         merchantName: 'SigmaForce CEP Official',
         upiId: 'sigmaforce@upi',
-        razorpayKeyId: 'rzp_test_sigmaforce2026',
+        razorpayKeyId: 'rzp_test_E66NI3Yg44x1mj',
         qrImageUrl: ''
     });
 
@@ -61,7 +61,16 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
         setErrorMessage('');
         setLoading(true);
 
-        const currentKey = paymentConfig.razorpayKeyId || 'rzp_test_sigmaforce2026';
+        const currentKey = paymentConfig.razorpayKeyId || 'rzp_test_E66NI3Yg44x1mj';
+        console.log("");
+        
+
+        // Check if using default non-registered placeholder key
+        if (currentKey === 'rzp_test_sigmaforce2026' || currentKey.length < 14) {
+            setLoading(false);
+            setErrorMessage('Razorpay Key Notice: "rzp_test_sigmaforce2026" is a placeholder key. To test real Razorpay popups, enter your official Key ID from dashboard.razorpay.com in Admin Settings or .env file. Or click "⚡ Instant Test Payment" below to test quota crediting.');
+            return;
+        }
 
         const options = {
             key: currentKey,
@@ -111,8 +120,8 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                 const rzp = new window.Razorpay(options);
                 rzp.on('payment.failed', function (response) {
                     setLoading(false);
-                    const desc = response.error ? (response.error.description || response.error.reason) : 'Payment cancelled or invalid Key ID.';
-                    setErrorMessage('Razorpay Gateway Notice: ' + desc);
+                    const desc = response.error ? (response.error.description || response.error.reason) : 'Invalid Razorpay Key ID or cancelled transaction.';
+                    setErrorMessage('Razorpay Gateway Notice: ' + desc + '. Please check your Razorpay Key ID in Admin Settings.');
                 });
                 rzp.open();
             } catch (err) {
@@ -120,23 +129,31 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                 setErrorMessage('Razorpay Popup Error: ' + (err.message || 'Could not open gateway popup. Check Key ID in Admin Settings.'));
             }
         } else {
-            // Fallback simulation mode if script is blocked by browser extension or offline
-            setTimeout(async () => {
-                const mockPaymentId = 'pay_sim_' + Math.random().toString(36).substring(2, 10);
-                const res = await firestoreEngine.processRazorpayPaymentSuccess({
-                    student: user,
-                    pkg,
-                    paymentId: mockPaymentId,
-                    amount: amountToPay
-                });
-                setLoading(false);
-                setSuccessPaymentId(mockPaymentId);
-                setSuccessMessage(t('quota_credited_msg'));
-                setTimeout(() => {
-                    if (onSuccess) onSuccess(res.user);
-                    onClose();
-                }, 3000);
-            }, 1000);
+            handleSimulatedPayment();
+        }
+    };
+
+    // Instant Simulated Test Payment for sandbox testing without real Razorpay account
+    const handleSimulatedPayment = async () => {
+        setLoading(true);
+        setErrorMessage('');
+        const mockPaymentId = 'pay_sim_' + Math.random().toString(36).substring(2, 10);
+        const res = await firestoreEngine.processRazorpayPaymentSuccess({
+            student: user,
+            pkg,
+            paymentId: mockPaymentId,
+            amount: amountToPay
+        });
+        setLoading(false);
+        if (res.success) {
+            setSuccessPaymentId(mockPaymentId);
+            setSuccessMessage(t('quota_credited_msg'));
+            setTimeout(() => {
+                if (onSuccess) onSuccess(res.user);
+                onClose();
+            }, 2500);
+        } else {
+            setErrorMessage('Simulated payment failed.');
         }
     };
 
@@ -290,6 +307,16 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                                 ) : (
                                     <span>⚡ {t('pay_via_razorpay_btn')} (₹{amountToPay})</span>
                                 )}
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                disabled={loading}
+                                onClick={handleSimulatedPayment}
+                                style={{ width: '100%', marginTop: '0.65rem', padding: '0.65rem', fontSize: '0.85rem', fontWeight: 700 }}
+                            >
+                                🧪 Test Mode: Simulate Instant Quota Credit (Without Key)
                             </button>
                         </div>
                     ) : (
