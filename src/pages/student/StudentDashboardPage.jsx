@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useExam } from '../../context/ExamContext.jsx';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { PackagePurchaseModal } from '../../components/student/PackagePurchaseModal.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
@@ -8,6 +9,7 @@ import { Modal } from '../../components/common/Modal.jsx';
 export const StudentDashboardPage = ({ onNavigate }) => {
     const { user } = useAuth();
     const { startPracticeTest } = useExam();
+    const { t } = useLanguage();
     const [exams, setExams] = useState([]);
     const [packages, setPackages] = useState([]);
     const [submissions, setSubmissions] = useState([]);
@@ -102,23 +104,23 @@ export const StudentDashboardPage = ({ onNavigate }) => {
             {/* Top Quota Metrics Banner */}
             <div className="stats-grid">
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--primary)' }}>
-                    <div className="stat-title">Remaining Test Tokens</div>
-                    <div className="stat-val" style={{ color: 'var(--primary)' }}>{userProfile ? (userProfile.remainingTests || 0) : 0} Tokens</div>
+                    <div className="stat-title">{t('remaining_tokens')}</div>
+                    <div className="stat-val" style={{ color: 'var(--primary)' }}>{userProfile ? (userProfile.remainingTests || 0) : 0} {t('tokens_unit')}</div>
                     <div className="stat-sub">
-                        {userProfile && (userProfile.remainingTests > 0) ? 'Active subscription plan' : 'No tests left. Buy package to unlock!'}
+                        {userProfile && (userProfile.remainingTests > 0) ? t('active_subscription') : t('no_tests_left')}
                     </div>
                 </div>
 
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--success)' }}>
-                    <div className="stat-title">Completed Mock Tests</div>
-                    <div className="stat-val" style={{ color: 'var(--success)' }}>{submissions.length} Attempted</div>
-                    <div className="stat-sub">Evaluated performance scorecards</div>
+                    <div className="stat-title">{t('completed_mock_tests')}</div>
+                    <div className="stat-val" style={{ color: 'var(--success)' }}>{submissions.length} {t('attempted_unit')}</div>
+                    <div className="stat-sub">{t('scorecards_evaluated')}</div>
                 </div>
 
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--purple)' }}>
-                    <div className="stat-title">Purchased Packages</div>
-                    <div className="stat-val" style={{ color: 'var(--purple)' }}>{userProfile && userProfile.purchasedPackages ? userProfile.purchasedPackages.length : 0} Plans</div>
-                    <div className="stat-sub">Active course subscriptions</div>
+                    <div className="stat-title">{t('purchased_packages')}</div>
+                    <div className="stat-val" style={{ color: 'var(--purple)' }}>{userProfile && userProfile.purchasedPackages ? userProfile.purchasedPackages.length : 0} {t('plans_unit')}</div>
+                    <div className="stat-sub">{t('active_subscriptions')}</div>
                 </div>
             </div>
 
@@ -126,8 +128,8 @@ export const StudentDashboardPage = ({ onNavigate }) => {
             <div className="card">
                 <div className="card-header">
                     <div>
-                        <h3 className="card-title">Available Course Packages & Practice Bundles</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Purchase test series packages via UPI QR code to instantly unlock paid mock exams.</p>
+                        <h3 className="card-title">{t('available_packages_title')}</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('available_packages_desc')}</p>
                     </div>
                 </div>
 

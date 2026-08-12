@@ -5,8 +5,10 @@ import { ExamConfigList } from '../../components/admin/ExamConfigList.jsx';
 import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export const AdminDashboardPage = () => {
+    const { t } = useLanguage();
     // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'exams' | 'reports'
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState({
@@ -42,10 +44,10 @@ export const AdminDashboardPage = () => {
             {/* Admin Header */}
             <div style={{ marginBottom: '1.5rem' }}>
                 <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '2.2rem', fontWeight: 800 }}>
-                    Administrative Control Panel & Governance
+                    {t('admin_panel_title')}
                 </h1>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.2rem' }}>
-                    Manage student test quota limits, course packages, question bank solutions, examination blueprints, and submission audit logs.
+                    {t('admin_panel_desc')}
                 </p>
             </div>
 
@@ -55,37 +57,37 @@ export const AdminDashboardPage = () => {
                     className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('overview')}
                 >
-                    Overview Summary
+                    {t('tab_overview')}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'students' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('students')}
                 >
-                    Student Accounts & Packages
+                    {t('tab_students')}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'packages' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('packages')}
                 >
-                    Course Packages
+                    {t('tab_packages')}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'questions' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('questions')}
                 >
-                    Question Bank & Solutions
+                    {t('tab_questions')}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('exams')}
                 >
-                    Exam Blueprints & Patterns
+                    {t('tab_exams')}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('reports')}
                 >
-                    Submission Reports
+                    {t('tab_reports')}
                 </button>
             </div>
 

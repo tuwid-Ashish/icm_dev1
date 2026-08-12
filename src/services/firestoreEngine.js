@@ -521,23 +521,114 @@ export const firestoreEngine = {
         return { success: true };
     },
 
-    // 15. Admin Merchant Payment Settings (UPI ID & QR Code Image Config)
+    // 14. Process Instant Razorpay Payment Success & Credit Student Quota
+    processRazorpayPaymentSuccess: async ({ student, pkg, paymentId, amount }) => {
+        const studentId = student.id || student.uid;
+        const currentRemaining = Number(student.remainingTests || 0);
+        const currentAllowed = Number(student.allowedTests || 0);
+        const addedQuota = Number(pkg.totalTests || 10);
+
+        const newPurchasedPackage = {
+            id: 'pkg_purch_' + Date.now(),
+            packageId: pkg.id,
+            packageName: pkg.name,
+            exam: pkg.exam,
+            totalTests: addedQuota,
+            amountPaid: amount || pkg.discountPrice || pkg.price,
+            paymentMethod: 'Razorpay',
+            razorpayPaymentId: paymentId,
+            paymentStatus: 'COMPLETED',
+            purchaseDate: new Date().toISOString()
+        };
+
+        const updatedStudent = {
+            ...student,
+            remainingTests: currentRemaining + addedQuota,
+            allowedTests: currentAllowed + addedQuota,
+            purchasedPackages: [...(student.purchasedPackages || []), newPurchasedPackage]
+        };
+
+        // 1. Update localStorage student list
+        const localStudents = await firestoreEngine.getStudents();
+        const nextLocal = localStudents.map(s => (s.id === studentId || s.email === student.email ? updatedStudent : s));
+        localStorage.setItem('cep_react_students', JSON.stringify(nextLocal));
+        localStorage.setItem('sigma_students', JSON.stringify(nextLocal));
+
+        // 2. Update current logged-in user in session
+        const currUser = storageService.getCurrentUser();
+        if (currUser && (currUser.id === studentId || currUser.email === student.email)) {
+            storageService.setCurrentUser(updatedStudent);
+        }
+
+        // 3. Log transaction request in Cloud Firestore / localStorage
+        const requestData = {
+            id: 'req_rzp_' + Date.now(),
+            studentId: studentId,
+            studentName: student.name,
+            studentEmail: student.email,
+            studentMobile: student.mobile || '9876543210',
+            packageId: pkg.id,
+            packageName: pkg.name,
+            targetExam: pkg.exam,
+            testQuota: addedQuota,
+            amount: amount || pkg.discountPrice || pkg.price,
+            paymentMethod: 'Razorpay',
+            utrNumber: paymentId, // Log Razorpay Payment ID as UTR reference
+            razorpayPaymentId: paymentId,
+            status: 'approved',
+            createdAt: new Date().toISOString(),
+            approvedAt: new Date().toISOString()
+        };
+
+        if (isFirebaseConnected && db) {
+            try {
+                await setDoc(doc(db, 'users', studentId), updatedStudent);
+                await setDoc(doc(db, 'package_requests', requestData.id), requestData);
+            } catch (e) {
+                console.warn('[Firestore Engine] Razorpay Firestore credit error:', e.message);
+            }
+        }
+
+        const localReqs = localStorage.getItem('sigma_package_requests');
+        const reqList = localReqs ? JSON.parse(localReqs) : [];
+        reqList.unshift(requestData);
+        localStorage.setItem('sigma_package_requests', JSON.stringify(reqList));
+
+        return {
+            success: true,
+            user: updatedStudent,
+            message: `Payment Successful! ${addedQuota} Tests credited instantly to your account.`
+        };
+    },
+
+    // 15. Admin Merchant Payment Settings (Razorpay Key ID & UPI Config)
     getMerchantPaymentSettings: async () => {
+        const envKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RAZORPAY_KEY_ID) ? import.meta.env.VITE_RAZORPAY_KEY_ID : '';
+        const defaultKey = envKey || 'rzp_test_sigmaforce2026';
+
         if (isFirebaseConnected && db) {
             try {
                 const snap = await getDoc(doc(db, 'settings', 'payment'));
                 if (snap.exists()) {
-                    return snap.data();
+                    const data = snap.data();
+                    return {
+                        merchantName: 'SigmaForce CEP Official',
+                        upiId: 'sigmaforce@upi',
+                        razorpayKeyId: envKey || data.razorpayKeyId || 'rzp_test_sigmaforce2026',
+                        ...data
+                    };
                 }
             } catch (e) {
                 console.warn('[Firestore Engine] Payment settings fallback:', e.message);
             }
         }
         const local = localStorage.getItem('sigma_merchant_payment_settings');
-        return local ? JSON.parse(local) : {
-            merchantName: 'SigmaForce CEP Official',
-            upiId: 'sigmaforce@upi',
-            qrImageUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR'
+        const parsed = local ? JSON.parse(local) : null;
+        return {
+            merchantName: parsed?.merchantName || 'SigmaForce CEP Official',
+            upiId: parsed?.upiId || 'sigmaforce@upi',
+            razorpayKeyId: envKey || parsed?.razorpayKeyId || defaultKey,
+            qrImageUrl: parsed?.qrImageUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR'
         };
     },
 

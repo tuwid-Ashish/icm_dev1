@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 
 export const HistoryPage = ({ onViewResult }) => {
     const { user } = useAuth();
+    const { t } = useLanguage();
     const [submissions, setSubmissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchFilter, setSearchFilter] = useState('');
@@ -57,10 +59,10 @@ export const HistoryPage = ({ onViewResult }) => {
             {/* Page Header */}
             <div style={{ marginBottom: '1.75rem' }}>
                 <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '2.1rem', fontWeight: 800 }}>
-                    Historical Audit & Performance Analytics
+                    {t('history_page_title')}
                 </h1>
                 <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.2rem' }}>
-                    In-depth historical test attempt logs, score trend analytics, and subject weakness detection.
+                    {t('history_page_desc')}
                 </p>
             </div>
 
@@ -68,8 +70,8 @@ export const HistoryPage = ({ onViewResult }) => {
             <div className="card" style={{ marginBottom: '2rem' }}>
                 <div className="card-header">
                     <div>
-                        <h3 className="card-title">Subject Accuracy & Weakness Detector</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Aggregated accuracy rates across all completed practice tests.</p>
+                        <h3 className="card-title">{t('weakness_detector_title')}</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('weakness_detector_desc')}</p>
                     </div>
                 </div>
 
@@ -86,7 +88,7 @@ export const HistoryPage = ({ onViewResult }) => {
                                     {acc}%
                                 </div>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-                                    {stat.correct} Correct of {stat.total} Attempted
+                                    {t('correct_of_attempted')} {stat.correct} / {stat.total} {t('attempted_word')}
                                 </div>
 
                                 <div style={{ height: '8px', background: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
@@ -102,15 +104,15 @@ export const HistoryPage = ({ onViewResult }) => {
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                        <h3 className="card-title">Attempt Log & Scorecards</h3>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Search and review detailed question-by-question scorecards.</p>
+                        <h3 className="card-title">{t('completed_log_title')}</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('scorecards_evaluated')}</p>
                     </div>
 
                     <input 
                         type="text"
                         className="form-control"
                         style={{ maxWidth: '280px' }}
-                        placeholder="Search exam name or code..."
+                        placeholder={t('search_history_placeholder')}
                         value={searchFilter}
                         onChange={e => setSearchFilter(e.target.value)}
                     />
@@ -120,21 +122,21 @@ export const HistoryPage = ({ onViewResult }) => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>Exam Name</th>
-                                <th>Date & Time</th>
-                                <th>Time Taken</th>
-                                <th>Net Score</th>
-                                <th>Percentage</th>
-                                <th>Accuracy</th>
-                                <th>Status</th>
-                                <th>Action</th>
+                                <th>{t('exam_name_th')}</th>
+                                <th>{t('date_time_th')}</th>
+                                <th>{t('time_taken_th')}</th>
+                                <th>{t('net_score_th')}</th>
+                                <th>{t('percentage_th')}</th>
+                                <th>{t('accuracy_th')}</th>
+                                <th>{t('result_th')}</th>
+                                <th>{t('action_th')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Loading completed test history...</td></tr>
+                                <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{t('loading_history')}</td></tr>
                             ) : filteredSubmissions.length === 0 ? (
-                                <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No test attempt logs match your search.</td></tr>
+                                <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{t('no_history_matches')}</td></tr>
                             ) : (
                                 filteredSubmissions.map(sub => (
                                     <tr key={sub.id}>
@@ -146,12 +148,12 @@ export const HistoryPage = ({ onViewResult }) => {
                                         <td>{sub.accuracy}%</td>
                                         <td>
                                             <span className={`badge ${sub.passed ? 'badge-success' : 'badge-danger'}`}>
-                                                {sub.passed ? 'QUALIFIED' : 'FAILED'}
+                                                {sub.passed ? t('qualified_badge') : t('failed_badge')}
                                             </span>
                                         </td>
                                         <td>
                                             <button className="btn btn-secondary btn-sm" onClick={() => onViewResult(sub)}>
-                                                View Scorecard
+                                                {t('view_scorecard_btn')}
                                             </button>
                                         </td>
                                     </tr>

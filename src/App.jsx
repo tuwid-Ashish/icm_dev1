@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ExamProvider, useExam } from './context/ExamContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { LanguageProvider } from './context/LanguageContext.jsx';
 
 import { Navbar } from './components/common/Navbar.jsx';
 import { LandingPage } from './pages/LandingPage.jsx';
@@ -129,9 +130,11 @@ export default function App() {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <ExamProvider>
-                    <MainAppContent />
-                </ExamProvider>
+                <LanguageProvider>
+                    <ExamProvider>
+                        <MainAppContent />
+                    </ExamProvider>
+                </LanguageProvider>
             </AuthProvider>
         </ThemeProvider>
     );

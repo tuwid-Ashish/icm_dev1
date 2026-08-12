@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export const Navbar = ({ activeRoute, onNavigate }) => {
     const { user, logout } = useAuth();
+    const { language, toggleLanguage, t } = useLanguage();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const closeMobileMenu = () => setIsMobileMenuOpen(false);
@@ -22,7 +24,7 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
             {/* Main Top Header Bar */}
             <div className="top-navbar-main">
                 <div className="brand-group" onClick={() => handleNavClick('home')}>
-                    <div className="brand-logo-text">SigmaForce CEP</div>
+                    <div className="brand-logo-text">{t('brand_name')}</div>
                 </div>
 
                 <button
@@ -46,19 +48,19 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                                     className={`nav-link ${activeRoute === 'dashboard' ? 'active' : ''}`}
                                     onClick={() => handleNavClick('dashboard')}
                                 >
-                                    Student Dashboard
+                                    {t('student_dashboard')}
                                 </button>
                                 <button 
                                     className={`nav-link ${activeRoute === 'exams' ? 'active' : ''}`}
                                     onClick={() => handleNavClick('exams')}
                                 >
-                                    Exam Catalog
+                                    {t('exam_catalog')}
                                 </button>
                                 <button 
                                     className={`nav-link ${activeRoute === 'history' ? 'active' : ''}`}
                                     onClick={() => handleNavClick('history')}
                                 >
-                                    Test History
+                                    {t('test_history')}
                                 </button>
                             </>
                         )}
@@ -68,21 +70,45 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                                 className={`nav-link ${activeRoute === 'admin_dashboard' ? 'active' : ''}`}
                                 onClick={() => handleNavClick('admin_dashboard')}
                             >
-                                Admin Portal
+                                {t('admin_portal')}
                             </button>
                         )}
                     </nav>
                 )}
 
                 {/* Right User Display & Actions */}
-                <div className="nav-user-actions">
+                <div className="nav-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {/* Language Switcher Badge */}
+                    <button 
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ 
+                            background: '#0f172a', 
+                            color: '#ffffff', 
+                            fontWeight: 800, 
+                            padding: '0.35rem 0.75rem',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            borderRadius: 'var(--radius-sm)'
+                        }}
+                        onClick={toggleLanguage}
+                        title="Switch Language / भाषा बदला"
+                    >
+                        <span>🌐</span>
+                        <span>{language === 'en' ? 'मराठी' : 'English'}</span>
+                    </button>
+
                     {user ? (
                         <div className="user-profile-badge">
                             <span className="user-name-text">
-                                {user.name} <span className="user-role-tag">({user.role === 'admin' ? 'Admin' : `${user.remainingTests || 0} Tests`})</span>
+                                {user.name} <span className="user-role-tag">({user.role === 'admin' ? t('administrator') : `${user.remainingTests || 0} ${t('tests_left')}`})</span>
                             </span>
                             <button className="btn-signout" onClick={handleLogout}>
-                                Sign Out
+                                {t('sign_out')}
                             </button>
                         </div>
                     ) : (
@@ -92,14 +118,14 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                                 style={{ background: '#0f172a', color: '#ffffff', fontWeight: 700 }}
                                 onClick={() => handleNavClick('login')}
                             >
-                                Sign In
+                                {t('sign_in')}
                             </button>
                             <button 
                                 className="btn btn-sm" 
                                 style={{ background: '#ffffff', color: '#ea580c', fontWeight: 800 }}
                                 onClick={() => handleNavClick('signup')}
                             >
-                                Get Started
+                                {t('get_started')}
                             </button>
                         </div>
                     )}

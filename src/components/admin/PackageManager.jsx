@@ -11,12 +11,6 @@ export const PackageManager = ({ onRefresh }) => {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingPkg, setEditingPkg] = useState(null);
 
-    // Merchant Payment Settings state
-    const [merchantName, setMerchantName] = useState('SigmaForce CEP Official');
-    const [upiId, setUpiId] = useState('sigmaforce@upi');
-    const [qrImageUrl, setQrImageUrl] = useState('');
-    const [settingsSavedMessage, setSettingsSavedMessage] = useState('');
-
     // Form state
     const [packageName, setPackageName] = useState('');
     const [targetExam, setTargetExam] = useState('Police Bharti');
@@ -25,6 +19,13 @@ export const PackageManager = ({ onRefresh }) => {
     const [discountPrice, setDiscountPrice] = useState(199);
     const [validity, setValidity] = useState('12 Months');
     const [status, setStatus] = useState('active');
+
+    // Merchant Payment Settings state
+    const [merchantName, setMerchantName] = useState('SigmaForce CEP Official');
+    const [upiId, setUpiId] = useState('sigmaforce@upi');
+    const [razorpayKeyId, setRazorpayKeyId] = useState('rzp_test_sigmaforce2026');
+    const [qrImageUrl, setQrImageUrl] = useState('');
+    const [settingsSavedMessage, setSettingsSavedMessage] = useState('');
 
     const loadPackages = async () => {
         setLoading(true);
@@ -44,6 +45,7 @@ export const PackageManager = ({ onRefresh }) => {
         if (settings) {
             setMerchantName(settings.merchantName || 'SigmaForce CEP Official');
             setUpiId(settings.upiId || 'sigmaforce@upi');
+            setRazorpayKeyId(settings.razorpayKeyId || 'rzp_test_sigmaforce2026');
             setQrImageUrl(settings.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=${encodeURIComponent(settings.upiId || 'sigmaforce@upi')}%26pn=${encodeURIComponent(settings.merchantName || 'SigmaForce')}%26cu=INR`);
         }
 
@@ -60,6 +62,7 @@ export const PackageManager = ({ onRefresh }) => {
         const updatedSettings = {
             merchantName: merchantName.trim(),
             upiId: upiId.trim(),
+            razorpayKeyId: razorpayKeyId.trim(),
             qrImageUrl: finalQrUrl,
             updatedAt: new Date().toISOString()
         };
@@ -192,6 +195,14 @@ export const PackageManager = ({ onRefresh }) => {
                                 <input type="text" className="form-control" required value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="e.g. sigmaforce@upi or 9876543210@paytm" />
                                 <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>
                                     This UPI ID is displayed to students and embedded in the dynamic QR code generator.
+                                </small>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label">Razorpay API Key ID (Live / Test Key) *</label>
+                                <input type="text" className="form-control" required value={razorpayKeyId} onChange={e => setRazorpayKeyId(e.target.value)} placeholder="e.g. rzp_live_xxxxxxxxxx or rzp_test_sigmaforce2026" />
+                                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>
+                                    Your official Razorpay Dashboard Key ID for launching instant online payment checkouts.
                                 </small>
                             </div>
 

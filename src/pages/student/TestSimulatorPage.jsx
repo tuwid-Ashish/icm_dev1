@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useExam } from '../../context/ExamContext.jsx';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
 
 export const TestSimulatorPage = () => {
@@ -15,6 +16,7 @@ export const TestSimulatorPage = () => {
         submitCurrentTest
     } = useExam();
 
+    const { t } = useLanguage();
     const [verifyModalOpen, setVerifyModalOpen] = useState(false);
 
     if (!activeSession || !activeSession.questions || activeSession.questions.length === 0) {
@@ -121,22 +123,22 @@ export const TestSimulatorPage = () => {
                                 disabled={currentQuestionIdx === 0}
                                 onClick={() => jumpToQuestion(currentQuestionIdx - 1)}
                             >
-                                Previous
+                                {t('previous_btn')}
                             </button>
                             <button className="btn btn-secondary" style={{ flex: 1, minWidth: '110px' }} onClick={() => clearAnswer(q.id)}>
-                                Clear Choice
+                                {t('clear_choice_btn')}
                             </button>
                         </div>
 
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: '280px' }}>
                             <button className="btn btn-secondary" style={{ flex: 1, minWidth: '130px', borderColor: 'var(--purple-border)', color: 'var(--purple)' }} onClick={() => markForReview(q.id)}>
-                                Mark for Review
+                                {t('mark_for_review_btn')}
                             </button>
                             <button className="btn btn-primary" style={{ flex: 1, minWidth: '130px' }} onClick={handleSaveAndNextClick}>
-                                {isLastQuestion ? 'Save & Review' : 'Save & Next'}
+                                {isLastQuestion ? t('save_review_btn') : t('save_next_btn')}
                             </button>
                             <button className="btn btn-danger" style={{ width: '100%', marginTop: '0.25rem' }} onClick={() => setVerifyModalOpen(true)}>
-                                Verify & Submit Test
+                                {t('verify_submit_btn')}
                             </button>
                         </div>
                     </div>
@@ -145,25 +147,25 @@ export const TestSimulatorPage = () => {
                 {/* Calendar-like Question Palette Grid */}
                 <div className="cbt-palette-panel">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                        <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', fontWeight: 800 }}>Question Palette</h4>
-                        <span className="badge badge-orange">{answeredCount + answeredMarkedCount} / {totalQs} Answered</span>
+                        <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', fontWeight: 800 }}>{t('question_palette_title')}</h4>
+                        <span className="badge badge-orange">{answeredCount + answeredMarkedCount} / {totalQs} {t('answered_stat')}</span>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--success)' }}>Answered:</span> <strong>{answeredCount}</strong>
+                            <span style={{ color: 'var(--success)' }}>{t('answered_stat')}:</span> <strong>{answeredCount}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--warning)' }}>Visited / Jumped:</span> <strong>{visitedCount}</strong>
+                            <span style={{ color: 'var(--warning)' }}>{t('visited_stat')}:</span> <strong>{visitedCount}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--purple)' }}>Marked for Review:</span> <strong>{markedCount}</strong>
+                            <span style={{ color: 'var(--purple)' }}>{t('marked_stat')}:</span> <strong>{markedCount}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--indigo)' }}>Answered & Marked:</span> <strong>{answeredMarkedCount}</strong>
+                            <span style={{ color: 'var(--indigo)' }}>{t('answered_marked_stat')}:</span> <strong>{answeredMarkedCount}</strong>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Not Visited:</span> <strong>{notVisitedCount}</strong>
+                            <span style={{ color: 'var(--text-muted)' }}>{t('not_visited_stat')}:</span> <strong>{notVisitedCount}</strong>
                         </div>
                     </div>
 
@@ -190,17 +192,17 @@ export const TestSimulatorPage = () => {
             <Modal
                 isOpen={verifyModalOpen}
                 onClose={() => setVerifyModalOpen(false)}
-                title="Confirm Test Verification & Submission"
+                title={t('confirm_submission_title')}
                 maxWidth="540px"
                 footer={
                     <>
-                        <button className="btn btn-secondary" onClick={() => setVerifyModalOpen(false)}>Return to Test</button>
-                        <button className="btn btn-danger" onClick={handleConfirmSubmit}>Finalize & Submit</button>
+                        <button className="btn btn-secondary" onClick={() => setVerifyModalOpen(false)}>{t('return_to_test_btn')}</button>
+                        <button className="btn btn-danger" onClick={handleConfirmSubmit}>{t('finalize_submit_btn')}</button>
                     </>
                 }
             >
                 <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                    Are you sure you want to finalize and submit your test paper?
+                    {t('confirm_submission_desc')}
                 </p>
 
                 <div style={{ background: 'var(--bg-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>

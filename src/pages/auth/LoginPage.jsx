@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
     const { login } = useAuth();
+    const { t } = useLanguage();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -28,10 +30,10 @@ export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
             <div className="auth-card">
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.5px', marginBottom: '0.35rem' }}>
-                        Portal Authentication
+                        {t('portal_auth_tag')}
                     </div>
-                    <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>Student Sign In</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Sign in to access practice test papers</p>
+                    <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>{t('student_signin_title')}</h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>{t('student_signin_desc')}</p>
                 </div>
 
                 {errorMessage && (
@@ -42,26 +44,26 @@ export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
-                        <label className="form-label">Email Address</label>
+                        <label className="form-label">{t('email_address_label')}</label>
                         <input 
                             type="email" 
                             className="form-control" 
                             required 
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Enter your registered email"
+                            placeholder={t('email_placeholder')}
                         />
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label">Password</label>
+                        <label className="form-label">{t('password_label')}</label>
                         <input 
                             type="password" 
                             className="form-control" 
                             required 
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
+                            placeholder={t('password_placeholder')}
                         />
                     </div>
 
@@ -71,17 +73,17 @@ export const LoginPage = ({ onSwitchToSignup, onLoginSuccess }) => {
                         disabled={loading}
                         style={{ width: '100%', marginTop: '0.5rem', padding: '0.85rem', fontSize: '1rem', fontWeight: 800 }}
                     >
-                        {loading ? 'Signing In...' : 'Sign In to Portal'}
+                        {loading ? t('signing_in_btn') : t('signin_portal_btn')}
                     </button>
                 </form>
 
                 <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                    Don't have an account?{' '}
+                    {t('dont_have_account')}{' '}
                     <button 
                         onClick={onSwitchToSignup}
                         style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
                     >
-                        Register Now
+                        {t('register_now')}
                     </button>
                 </div>
             </div>
