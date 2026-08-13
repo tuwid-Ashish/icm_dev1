@@ -5,6 +5,7 @@
 
 import { firestoreEngine } from './firestoreEngine.js';
 import { storageService } from './storageService.js';
+import { getExamAccess } from '../utils/examAccess.js';
 
 class ExamEngine {
     /**
@@ -26,15 +27,19 @@ class ExamEngine {
             return { error: 'Invalid exam selected.' };
         }
 
-        // Engine-side Paywall & Quota Verification
+        // Engine-side Paywall & Quota Verification — this is the actual gate
+        // before a paper is generated, not just a UI display check, so it
+        // has to be exam-scoped: a purchase for one exam must not let a
+        // student start a *different* paid exam just because remainingTests
+        // (a pooled counter) happens to be > 0.
         const currentUser = await firestoreEngine.getUserProfile(studentId) || storageService.getCurrentUser();
-        const isFree = exam.isFreeTest || false;
+        const access = getExamAccess(currentUser, exam);
 
-        if (!isFree) {
-            const remaining = currentUser?.remainingTests || 0;
-            if (remaining <= 0) {
-                return { error: 'Insufficient test quota remaining. Please purchase a course package to launch mock tests.' };
-            }
+        if (!access.unlocked) {
+            const message = access.reason === 'quota_exhausted'
+                ? 'Insufficient test quota remaining. Please purchase a course package to launch mock tests.'
+                : `This exam requires the "${access.requiredExamName || exam.name}" package. Please purchase it to launch mock tests.`;
+            return { error: message };
         }
 
         const allQuestions = await firestoreEngine.getQuestions();

@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { PackagePurchaseModal } from '../../components/student/PackagePurchaseModal.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
+import { getExamAccess } from '../../utils/examAccess.js';
 
 export const StudentDashboardPage = ({ onNavigate }) => {
     const { user } = useAuth();
@@ -52,25 +53,14 @@ export const StudentDashboardPage = ({ onNavigate }) => {
         loadDashboardData();
     }, [user]);
 
-    const isExamUnlocked = (exam) => {
-        if (exam.isFreeTest) return true;
-        if (!userProfile) return false;
-        
-        const allowed = userProfile.allowedTests || 0;
-        const remaining = userProfile.remainingTests || 0;
-        if (allowed > 0 && remaining > 0) return true;
-
-        const purchased = userProfile.purchasedPackages || [];
-        if (purchased.some(p => p.exam === exam.name || p.exam === exam.code || exam.name.includes(p.exam))) {
-            return true;
-        }
-
-        return false;
-    };
-
     const handleExamCardClick = (exam) => {
-        if (!isExamUnlocked(exam)) {
-            const matchingPkg = packages.find(p => p.exam === exam.name || p.exam === exam.code || exam.name.includes(p.exam)) || packages[0];
+        const access = getExamAccess(userProfile, exam);
+        if (!access.unlocked) {
+            const matchingPkg = packages.find(p => p.examId === exam.id);
+            if (!matchingPkg) {
+                alert(`No package is currently configured to unlock "${exam.name}". Please contact support.`);
+                return;
+            }
             setSelectedPkg(matchingPkg);
             setPurchaseModalOpen(true);
             return;
@@ -134,31 +124,44 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                    {packages.map(pkg => (
-                        <div key={pkg.id} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: 'var(--shadow-sm)' }}>
-                            <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                    <span className="badge badge-purple">{pkg.exam}</span>
-                                    <span className="badge badge-success">{pkg.validity}</span>
-                                </div>
-                                <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.35rem' }}>{pkg.name}</h4>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                                    Includes <strong>{pkg.totalTests} Full Length Blueprint Tests</strong> with detailed solutions & accuracy analytics.
+                    {packages.map(pkg => {
+                        const alreadyPurchased = (userProfile?.purchasedPackages || []).some(p => p.packageId === pkg.id);
+                        return (
+                            <div key={pkg.id} style={{ background: 'var(--bg-surface)', border: alreadyPurchased ? '1px solid var(--success-border)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: 'var(--shadow-sm)' }}>
+                                <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                        <span className="badge badge-purple">{pkg.exam}</span>
+                                        {alreadyPurchased ? (
+                                            <span className="badge badge-success">✓ Purchased</span>
+                                        ) : (
+                                            <span className="badge badge-success">{pkg.validity}</span>
+                                        )}
+                                    </div>
+                                    <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.35rem' }}>{pkg.name}</h4>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                                        Includes <strong>{pkg.totalTests} Full Length Blueprint Tests</strong> with detailed solutions & accuracy analytics.
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '1.25rem' }}>
+                                        <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>₹{pkg.discountPrice || pkg.price}</span>
+                                        {pkg.discountPrice && pkg.discountPrice < pkg.price && (
+                                            <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '0.9rem' }}>₹{pkg.price}</span>
+                                        )}
+                                    </div>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                                    <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--success)' }}>₹{pkg.discountPrice || pkg.price}</span>
-                                    {pkg.discountPrice && pkg.discountPrice < pkg.price && (
-                                        <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '0.9rem' }}>₹{pkg.price}</span>
-                                    )}
-                                </div>
+                                {alreadyPurchased ? (
+                                    <button className="btn btn-secondary" style={{ width: '100%', fontWeight: 700 }} disabled>
+                                        ✓ Already Active
+                                    </button>
+                                ) : (
+                                    <button className="btn btn-primary" style={{ width: '100%', fontWeight: 700 }} onClick={() => handleOpenPurchase(pkg)}>
+                                        Buy Package (UPI QR / UTR)
+                                    </button>
+                                )}
                             </div>
-
-                            <button className="btn btn-primary" style={{ width: '100%', fontWeight: 700 }} onClick={() => handleOpenPurchase(pkg)}>
-                                Buy Package (UPI QR / UTR)
-                            </button>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
@@ -176,7 +179,8 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                 ) : (
                     <div className="cards-equal-grid">
                         {exams.map(e => {
-                            const unlocked = isExamUnlocked(e);
+                            const access = getExamAccess(userProfile, e);
+                            const unlocked = access.unlocked;
                             return (
                                 <div key={e.id} className="exam-select-card" onClick={() => handleExamCardClick(e)}>
                                     <div>
@@ -194,16 +198,22 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                                             {e.description || 'Full length online CBT practice test series.'}
                                         </p>
 
-                                        <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
+                                        <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: !unlocked && access.reason === 'no_package' ? '0.5rem' : '1.5rem' }}>
                                             <div>Duration: <strong>{e.durationMinutes} Mins</strong></div>
                                             <div>Questions: <strong>{e.totalQuestions} Qs</strong></div>
                                             <div>Total Marks: <strong>{e.totalMarks} M</strong></div>
                                             <div>Negative Rate: <strong>{e.negativeMarkingRate}</strong></div>
                                         </div>
+
+                                        {!unlocked && access.reason === 'no_package' && (
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--danger)', marginBottom: '1rem', fontWeight: 600 }}>
+                                                🔒 Requires the "{access.requiredExamName}" package
+                                            </p>
+                                        )}
                                     </div>
 
                                     <button className={`btn ${unlocked ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', fontWeight: 700 }}>
-                                        {e.isFreeTest ? 'Launch Free Test' : unlocked ? 'Configure & Launch Test' : 'Unlock Mock Exam (Buy Package)'}
+                                        {e.isFreeTest ? 'Launch Free Test' : unlocked ? 'Configure & Launch Test' : access.reason === 'quota_exhausted' ? 'Quota Exhausted (Buy More)' : 'Unlock Mock Exam (Buy Package)'}
                                     </button>
                                 </div>
                             );

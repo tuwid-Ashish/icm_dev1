@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useExam } from '../../context/ExamContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
+import { getExamAccess } from '../../utils/examAccess.js';
 
 export const ExamCatalogPage = () => {
     const { user } = useAuth();
@@ -90,10 +91,8 @@ export const ExamCatalogPage = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                     {exams.map(e => {
                         const syllabus = syllabusDetails[e.id] || [];
-                        const isAccessible = e.isFreeTest || (
-                            (user?.remainingTests || 0) > 0 && 
-                            ((user?.purchasedPackages || []).length === 0 || (user?.purchasedPackages || []).some(p => p.exam === e.name || p.exam === e.code || e.name.includes(p.exam)))
-                        );
+                        const access = getExamAccess(user, e);
+                        const isAccessible = access.unlocked;
 
                         return (
                             <div key={e.id} className="card">
@@ -112,7 +111,7 @@ export const ExamCatalogPage = () => {
                                         disabled={!isAccessible}
                                         onClick={() => handleOpenModal(e)}
                                     >
-                                        {!isAccessible ? ((user?.remainingTests || 0) <= 0 ? t('quota_exhausted_btn') : t('package_purchase_required_btn')) : t('configure_launch_paper')}
+                                        {!isAccessible ? (access.reason === 'quota_exhausted' ? t('quota_exhausted_btn') : t('package_purchase_required_btn')) : t('configure_launch_paper')}
                                     </button>
                                 </div>
 

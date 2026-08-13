@@ -6,14 +6,17 @@ import { Modal } from '../common/Modal.jsx';
 export const PackageManager = ({ onRefresh }) => {
     const [subTab, setSubTab] = useState('packages'); // 'packages' | 'requests' | 'payment_config'
     const [packages, setPackages] = useState([]);
+    const [exams, setExams] = useState([]);
     const [requestsCount, setRequestsCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [editingPkg, setEditingPkg] = useState(null);
 
-    // Form state
+    // Form state — examId is the canonical link (Firestore exam doc id);
+    // the exam's display name is derived from it at save time, not typed
+    // freely, so packages always point at a real exam.
     const [packageName, setPackageName] = useState('');
-    const [targetExam, setTargetExam] = useState('Police Bharti');
+    const [targetExamId, setTargetExamId] = useState('');
     const [totalTests, setTotalTests] = useState(100);
     const [price, setPrice] = useState(299);
     const [discountPrice, setDiscountPrice] = useState(199);
@@ -35,6 +38,14 @@ export const PackageManager = ({ onRefresh }) => {
         } catch (e) {
             console.error('Error loading packages:', e);
             setPackages([]);
+        }
+
+        try {
+            const examList = await firestoreEngine.getExams();
+            setExams(examList);
+        } catch (e) {
+            console.error('Error loading exams:', e);
+            setExams([]);
         }
 
         const reqs = await firestoreEngine.getPackagePurchaseRequests();
@@ -77,7 +88,11 @@ export const PackageManager = ({ onRefresh }) => {
         setEditingPkg(p);
         if (p) {
             setPackageName(p.name);
-            setTargetExam(p.exam);
+            // Legacy packages (created before examId existed) fall back to
+            // matching their old free-text exam label against the real
+            // exams list, so editing one doesn't show a blank selector.
+            const resolvedExamId = p.examId || exams.find(ex => ex.name === p.exam)?.id || '';
+            setTargetExamId(resolvedExamId);
             setTotalTests(p.totalTests);
             setPrice(p.price);
             setDiscountPrice(p.discountPrice || p.price);
@@ -85,7 +100,7 @@ export const PackageManager = ({ onRefresh }) => {
             setStatus(p.status);
         } else {
             setPackageName('');
-            setTargetExam('Police Bharti');
+            setTargetExamId(exams[0]?.id || '');
             setTotalTests(100);
             setPrice(299);
             setDiscountPrice(199);
@@ -98,10 +113,12 @@ export const PackageManager = ({ onRefresh }) => {
     const handleSave = async (e) => {
         e.preventDefault();
         const pkgId = editingPkg ? editingPkg.id : 'pkg_' + Date.now();
+        const selectedExam = exams.find(ex => ex.id === targetExamId);
         const pkgData = {
             id: pkgId,
             name: packageName,
-            exam: targetExam,
+            examId: targetExamId,
+            exam: selectedExam?.name || selectedExam?.title || '',
             totalTests: parseInt(totalTests, 10),
             price: parseFloat(price),
             discountPrice: parseFloat(discountPrice),
@@ -325,11 +342,12 @@ export const PackageManager = ({ onRefresh }) => {
 
                         <div className="form-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div>
-                                <label className="form-label">Target Exam / Batch</label>
-                                <select className="form-control" value={targetExam} onChange={e => setTargetExam(e.target.value)}>
-                                    <option value="Police Bharti">Police Bharti</option>
-                                    <option value="Vanrakshak">Vanrakshak (Forest Guard)</option>
-                                    <option value="SSC GD">SSC GD Constable</option>
+                                <label className="form-label">Target Exam</label>
+                                <select className="form-control" required value={targetExamId} onChange={e => setTargetExamId(e.target.value)}>
+                                    <option value="" disabled>Select an exam...</option>
+                                    {exams.map(ex => (
+                                        <option key={ex.id} value={ex.id}>{ex.name}{ex.isFreeTest ? ' (Free Test)' : ''}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div>

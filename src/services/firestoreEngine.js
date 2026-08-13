@@ -425,13 +425,24 @@ export const firestoreEngine = {
 
                 const student = await firestoreEngine.getUserProfile(req.studentId);
                 if (student) {
+                    // Look up the package to snapshot its examId — req itself
+                    // only carries a display label (targetExam), the same gap
+                    // that caused the Dashboard/Catalog access bug.
+                    const allPackages = await firestoreEngine.getPackages();
+                    const sourcePkg = allPackages.find(p => p.id === req.packageId);
+
                     const newPkg = {
+                        id: 'pkg_purch_' + Date.now(),
+                        packageId: req.packageId || null,
+                        examId: sourcePkg?.examId || null,
                         packageName: req.packageName,
                         exam: req.targetExam,
-                        purchaseDate: new Date().toLocaleDateString('en-IN'),
-                        expiry: '12 Months',
-                        paymentStatus: 'Paid',
-                        utrNumber: req.utrNumber
+                        totalTests: req.testQuota || 100,
+                        amountPaid: req.amount || sourcePkg?.discountPrice || sourcePkg?.price || 0,
+                        paymentMethod: 'Manual UPI',
+                        paymentReference: req.utrNumber,
+                        paymentStatus: 'COMPLETED',
+                        purchaseDate: new Date().toISOString()
                     };
                     const currentPkgs = student.purchasedPackages || [];
                     const nextPkgs = [...currentPkgs, newPkg];
@@ -498,32 +509,32 @@ export const firestoreEngine = {
     },
 
     // 14a-ii. Verify a completed Razorpay payment server-side
-    // (/api/razorpay/verify-payment) and credit quota only if the HMAC
-    // signature genuinely came from Razorpay — replaces the old pattern of
-    // crediting quota directly from a client-side Firestore write.
+    // (/api/razorpay/verify-payment checks the HMAC signature using the
+    // Key Secret, which never reaches the browser) — only a genuine
+    // Razorpay-signed payment reaches this point. Crediting itself then
+    // happens client-side via processRazorpayPaymentSuccess below, same
+    // code path as the "simulate payment" test button. Deliberately kept
+    // simple (no Firebase Admin SDK, no webhook) to match this app's
+    // actual risk profile.
     verifyRazorpayPayment: async ({ orderId, paymentId, signature, student, pkg, amount }) => {
         const res = await fetch('/api/razorpay/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId, paymentId, signature, student, pkg, amount })
+            body: JSON.stringify({ orderId, paymentId, signature })
         });
         const data = await res.json();
 
-        if (data.success) {
-            const currUser = storageService.getCurrentUser();
-            const studentId = student.uid || student.id;
-            if (currUser && (currUser.id === studentId || currUser.uid === studentId)) {
-                storageService.setCurrentUser(data.user);
-            }
+        if (!data.verified) {
+            return { success: false, error: data.error || 'Payment verification failed.' };
         }
 
-        return data;
+        return firestoreEngine.processRazorpayPaymentSuccess({ student, pkg, paymentId, amount });
     },
 
     // 14b. Process Instant Razorpay Payment Success & Credit Student Quota
-    // NOTE: only used by the client-side "Simulate Instant Quota Credit" test
-    // button (no real payment involved). Real payments go through
-    // verifyRazorpayPayment above, which credits quota server-side.
+    // Used both by the "Simulate Instant Quota Credit" test button and, via
+    // verifyRazorpayPayment above, by real payments after the server has
+    // confirmed the Razorpay signature is genuine.
     processRazorpayPaymentSuccess: async ({ student, pkg, paymentId, amount }) => {
         const studentId = student.uid || student.id;
         const profile = await firestoreEngine.getUserProfile(studentId);
@@ -534,12 +545,13 @@ export const firestoreEngine = {
         const newPurchasedPackage = {
             id: 'pkg_purch_' + Date.now(),
             packageId: pkg.id,
+            examId: pkg.examId || null,
             packageName: pkg.name,
             exam: pkg.exam,
             totalTests: addedQuota,
             amountPaid: amount || pkg.discountPrice || pkg.price,
             paymentMethod: 'Razorpay',
-            razorpayPaymentId: paymentId,
+            paymentReference: paymentId,
             paymentStatus: 'COMPLETED',
             purchaseDate: new Date().toISOString()
         };
@@ -598,7 +610,7 @@ export const firestoreEngine = {
 
     // 15. Admin Merchant Payment Settings (Source of Truth: Firestore 'settings/payment' document)
     getMerchantPaymentSettings: async () => {
-        const envKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RAZORPAY_KEY_ID) ? import.meta.env.VITE_RAZORPAY_KEY_ID : '';
+        const envKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
         const DEFAULT_KEY = 'rzp_test_E66NI3Yg44x1mj';
 
         const resolveKey = (adminSavedKey) => {
