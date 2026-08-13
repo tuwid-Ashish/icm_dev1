@@ -7,13 +7,14 @@ import {
     getDoc, 
     setDoc, 
     addDoc, 
-    updateDoc 
+    updateDoc,
+    deleteDoc
 } from './firebase.js';
 
 import { storageService } from './storageService.js';
 
 export const firestoreEngine = {
-    // 1. Fetch Exams
+    // 1. Fetch Exams (Source of Truth: Firestore 'exams' collection)
     getExams: async () => {
         if (isFirebaseConnected && db) {
             try {
@@ -23,14 +24,16 @@ export const firestoreEngine = {
                     console.log(`[Firestore Engine] Fetched ${exams.length} exams from Cloud Firestore.`);
                     return exams;
                 }
+                return [];
             } catch (err) {
-                console.warn('[Firestore Engine] Error fetching exams from Firestore, using local fallback:', err.message);
+                console.error('[Firestore Engine] Error fetching exams from Firestore:', err.message);
+                return [];
             }
         }
-        return storageService.getExams();
+        return [];
     },
 
-    // 2. Fetch Questions
+    // 2. Fetch Questions (Source of Truth: Firestore 'questions' collection)
     getQuestions: async (batchFilter = null) => {
         if (isFirebaseConnected && db) {
             try {
@@ -49,98 +52,113 @@ export const firestoreEngine = {
                     console.log(`[Firestore Engine] Fetched ${questions.length} questions from Cloud Firestore.`);
                     return questions;
                 }
+                return [];
             } catch (err) {
-                console.warn('[Firestore Engine] Error fetching questions from Firestore, using local fallback:', err.message);
+                console.error('[Firestore Engine] Error fetching questions from Firestore:', err.message);
+                return [];
             }
         }
-        return storageService.getQuestions();
+        return [];
     },
 
-    // 3. Save Question
+    // 3. Save Question (Firestore 'questions' collection)
     saveQuestion: async (questionData) => {
         if (isFirebaseConnected && db) {
             try {
-                const qRef = doc(db, 'questions', questionData.id);
-                await setDoc(qRef, questionData);
-                console.log('[Firestore Engine] Saved question:', questionData.id);
+                const qId = questionData.id || 'Q-' + Date.now().toString(36).toUpperCase();
+                const normalized = {
+                    ...questionData,
+                    id: qId,
+                    correctOption: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
+                    correctIndex: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
+                    updatedAt: new Date().toISOString()
+                };
+                const qRef = doc(db, 'questions', qId);
+                await setDoc(qRef, normalized, { merge: true });
+                console.log('[Firestore Engine] Saved question to Cloud Firestore:', qId);
+                return normalized;
             } catch (err) {
-                console.warn('[Firestore Engine] Error saving question to Firestore:', err.message);
+                console.error('[Firestore Engine] Error saving question to Firestore:', err.message);
+                throw err;
             }
         }
-        storageService.saveQuestion(questionData);
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 4. Save Exam Blueprint
+    // 3b. Delete Question (Firestore 'questions' collection)
+    deleteQuestion: async (questionId) => {
+        if (isFirebaseConnected && db) {
+            try {
+                await deleteDoc(doc(db, 'questions', questionId));
+                console.log('[Firestore Engine] Deleted question from Firestore:', questionId);
+                return { success: true };
+            } catch (err) {
+                console.error('[Firestore Engine] Error deleting question from Firestore:', err.message);
+                throw err;
+            }
+        }
+        throw new Error('Firestore database is not connected.');
+    },
+
+    // 4. Save Exam Blueprint (Firestore 'exams' collection)
     saveExamBlueprint: async (examData) => {
         if (isFirebaseConnected && db) {
             try {
                 const eRef = doc(db, 'exams', examData.id);
-                await setDoc(eRef, examData);
-                console.log('[Firestore Engine] Saved exam blueprint:', examData.id);
+                await setDoc(eRef, examData, { merge: true });
+                console.log('[Firestore Engine] Saved exam blueprint to Cloud Firestore:', examData.id);
+                return examData;
             } catch (err) {
-                console.warn('[Firestore Engine] Error saving exam to Firestore:', err.message);
+                console.error('[Firestore Engine] Error saving exam blueprint to Firestore:', err.message);
+                throw err;
             }
         }
-        storageService.saveExamBlueprint(examData);
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 5. Get Student Profile & Test Quotas
+    // 5. Get Student Profile & Test Quotas (Firestore 'users' collection)
     getUserProfile: async (uid) => {
+        if (!uid) return null;
         if (isFirebaseConnected && db) {
             try {
                 const userRef = doc(db, 'users', uid);
                 const snap = await getDoc(userRef);
                 if (snap.exists()) {
-                    return { id: snap.id, ...snap.data() };
+                    return { id: snap.id, uid: snap.id, ...snap.data() };
                 }
+                return null;
             } catch (err) {
-                console.warn('[Firestore Engine] Error getting user profile:', err.message);
+                console.error('[Firestore Engine] Error getting user profile:', err.message);
+                return null;
             }
         }
-        const curr = storageService.getCurrentUser();
-        return curr && (curr.id === uid || curr.uid === uid) ? curr : {
-            uid,
-            name: 'Alex Student',
-            email: 'student@sigma.com',
-            mobile: '9876543210',
-            allowedTests: 0,
-            remainingTests: 0,
-            completedTests: 0,
-            status: 'active'
-        };
+        return null;
     },
 
-    // 6. Fetch ALL Registered Student Profiles (Cloud Firestore + Local Storage)
+    // 6. Fetch ALL Registered Student Profiles (Firestore 'users' collection)
     getStudents: async () => {
-        let firestoreStudents = [];
         if (isFirebaseConnected && db) {
             try {
                 const snapshot = await getDocs(collection(db, 'users'));
                 if (!snapshot.empty) {
-                    firestoreStudents = snapshot.docs
+                    const students = snapshot.docs
                         .map(d => ({ id: d.id, uid: d.id, ...d.data() }))
                         .filter(u => u.role !== 'admin');
-                    console.log(`[Firestore Engine] Fetched ${firestoreStudents.length} registered students from Cloud Firestore.`);
+                    console.log(`[Firestore Engine] Fetched ${students.length} registered students from Cloud Firestore.`);
+                    return students;
                 }
+                return [];
             } catch (err) {
-                console.warn('[Firestore Engine] Error fetching users from Firestore:', err.message);
+                console.error('[Firestore Engine] Error fetching users from Firestore:', err.message);
+                return [];
             }
         }
-
-        const localStudents = storageService.getStudents();
-        const combined = [...firestoreStudents];
-        localStudents.forEach(ls => {
-            if (!combined.some(cs => cs.email === ls.email || cs.id === ls.id)) {
-                combined.push(ls);
-            }
-        });
-
-        return combined;
+        return [];
     },
 
-    // 7. Update Student Quota with Instant Storage & Active User Sync
+    // 7. Update Student Quota in Firestore
     updateStudentQuota: async (uid, allowedTests, status = 'active') => {
-        const allowedNum = parseInt(allowedTests, 10);
+        const allowedNum = parseInt(allowedTests, 10) || 0;
         const profile = await firestoreEngine.getUserProfile(uid);
         const completed = profile ? (profile.completedTests || 0) : 0;
         const remaining = Math.max(0, allowedNum - completed);
@@ -151,60 +169,29 @@ export const firestoreEngine = {
                 await updateDoc(userRef, {
                     allowedTests: allowedNum,
                     remainingTests: remaining,
-                    status
+                    status,
+                    updatedAt: new Date().toISOString()
                 });
+                const updated = { ...profile, allowedTests: allowedNum, remainingTests: remaining, status };
+                
+                const currUser = storageService.getCurrentUser();
+                if (currUser && (currUser.id === uid || currUser.uid === uid)) {
+                    storageService.setCurrentUser(updated);
+                }
+                return updated;
             } catch (err) {
-                console.warn('[Firestore Engine] Error updating quota:', err.message);
+                console.error('[Firestore Engine] Error updating quota in Firestore:', err.message);
+                throw err;
             }
         }
-        const students = storageService.getStudents();
-        const index = students.findIndex(s => s.id === uid || s.uid === uid || (profile && s.email === profile.email));
-        let updatedProfile = null;
-
-        if (index !== -1) {
-            students[index] = {
-                ...students[index],
-                allowedTests: allowedNum,
-                remainingTests: remaining,
-                status
-            };
-            updatedProfile = students[index];
-        } else if (profile) {
-            updatedProfile = {
-                ...profile,
-                allowedTests: allowedNum,
-                remainingTests: remaining,
-                status
-            };
-            students.push(updatedProfile);
-        } else {
-            updatedProfile = {
-                id: uid,
-                uid,
-                allowedTests: allowedNum,
-                remainingTests: remaining,
-                completedTests: 0,
-                status
-            };
-            students.push(updatedProfile);
-        }
-
-        localStorage.setItem('cep_react_students', JSON.stringify(students));
-        localStorage.setItem('sigma_students', JSON.stringify(students));
-
-        const currUser = storageService.getCurrentUser();
-        if (currUser && (currUser.id === uid || currUser.uid === uid || (profile && currUser.email === profile.email))) {
-            storageService.setCurrentUser({ ...currUser, ...updatedProfile });
-        }
-
-        return updatedProfile;
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 7b. Save Complete Student Profile Details (Name, Email, Mobile, Enrollment ID, Quota, Status)
+    // 7b. Save Complete Student Profile Details (Firestore 'users' collection)
     saveStudentProfile: async (studentData) => {
-        const { id, uid, name, email, mobile, enrollmentId, allowedTests, status } = studentData;
-        const stdId = id || uid || 'std_' + Date.now();
-        const allowedNum = parseInt(allowedTests, 10) || 0;
+        const stdId = studentData.uid || studentData.id;
+        if (!stdId) throw new Error('Student UID is required.');
+        const allowedNum = parseInt(studentData.allowedTests, 10) || 0;
         
         const existing = await firestoreEngine.getUserProfile(stdId);
         const completed = existing ? (existing.completedTests || 0) : 0;
@@ -212,161 +199,172 @@ export const firestoreEngine = {
 
         const updatedProfile = {
             ...(existing || {}),
-            id: stdId,
             uid: stdId,
-            name: name || existing?.name || 'Student User',
-            email: email || existing?.email || '',
-            mobile: mobile || existing?.mobile || '9876543210',
-            enrollmentId: enrollmentId || existing?.enrollmentId || ('SIGMA-2026-' + Math.floor(1000 + Math.random() * 9000)),
+            id: stdId,
+            name: studentData.name || existing?.name || '',
+            email: studentData.email || existing?.email || '',
+            mobile: studentData.mobile || existing?.mobile || '',
+            enrollmentId: studentData.enrollmentId || existing?.enrollmentId || ('SIGMA-2026-' + Math.floor(1000 + Math.random() * 9000)),
             allowedTests: allowedNum,
             remainingTests: remaining,
             completedTests: completed,
             purchasedPackages: existing?.purchasedPackages || [],
-            status: status || 'active'
+            role: 'student',
+            status: studentData.status || 'active',
+            updatedAt: new Date().toISOString()
         };
 
         if (isFirebaseConnected && db) {
             try {
-                await setDoc(doc(db, 'users', stdId), updatedProfile);
+                await setDoc(doc(db, 'users', stdId), updatedProfile, { merge: true });
+                const currUser = storageService.getCurrentUser();
+                if (currUser && (currUser.id === stdId || currUser.uid === stdId)) {
+                    storageService.setCurrentUser(updatedProfile);
+                }
+                return updatedProfile;
             } catch (err) {
-                console.warn('[Firestore Engine] Error saving student profile:', err.message);
+                console.error('[Firestore Engine] Error saving student profile to Firestore:', err.message);
+                throw err;
             }
         }
-
-        const students = storageService.getStudents();
-        const index = students.findIndex(s => s.id === stdId || s.uid === stdId || s.email === updatedProfile.email);
-        if (index !== -1) {
-            students[index] = updatedProfile;
-        } else {
-            students.push(updatedProfile);
-        }
-
-        localStorage.setItem('cep_react_students', JSON.stringify(students));
-        localStorage.setItem('sigma_students', JSON.stringify(students));
-
-        const currUser = storageService.getCurrentUser();
-        if (currUser && (currUser.id === stdId || currUser.uid === stdId || currUser.email === updatedProfile.email)) {
-            storageService.setCurrentUser({ ...currUser, ...updatedProfile });
-        }
-
-        return updatedProfile;
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 8. Decrement Student Quota on Exam Start
+    // 8. Decrement Student Quota after Test Start
     decrementStudentQuota: async (uid) => {
         const profile = await firestoreEngine.getUserProfile(uid);
-        if (profile) {
-            const nextRemaining = Math.max(0, (profile.remainingTests || 1) - 1);
-            const nextCompleted = (profile.completedTests || 0) + 1;
-            
-            if (isFirebaseConnected && db) {
-                try {
-                    const userRef = doc(db, 'users', uid);
-                    await updateDoc(userRef, {
-                        remainingTests: nextRemaining,
-                        completedTests: nextCompleted
-                    });
-                } catch (e) {
-                    console.warn('[Firestore Engine] Quota decrement fallback:', e.message);
-                }
-            }
+        if (!profile) return;
 
-            const updatedProfile = {
-                ...profile,
-                remainingTests: nextRemaining,
-                completedTests: nextCompleted
-            };
-            storageService.setCurrentUser(updatedProfile);
-        }
-    },
+        const currentRemaining = profile.remainingTests || 0;
+        if (currentRemaining <= 0) return;
 
-    // 9. Save Scorecard Submission
-    saveSubmission: async (submissionData) => {
+        const nextRemaining = Math.max(0, currentRemaining - 1);
+        const nextCompleted = (profile.completedTests || 0) + 1;
+        
         if (isFirebaseConnected && db) {
             try {
-                const subRef = doc(db, 'submissions', submissionData.id);
-                await setDoc(subRef, submissionData);
-                console.log('[Firestore Engine] Saved submission to Cloud Firestore:', submissionData.id);
-            } catch (err) {
-                console.warn('[Firestore Engine] Error saving submission to Firestore:', err.message);
+                const userRef = doc(db, 'users', uid);
+                await updateDoc(userRef, {
+                    remainingTests: nextRemaining,
+                    completedTests: nextCompleted,
+                    updatedAt: new Date().toISOString()
+                });
+
+                const updatedProfile = {
+                    ...profile,
+                    remainingTests: nextRemaining,
+                    completedTests: nextCompleted
+                };
+                storageService.setCurrentUser(updatedProfile);
+            } catch (e) {
+                console.error('[Firestore Engine] Quota decrement error:', e.message);
             }
         }
-        storageService.saveSubmission(submissionData);
     },
 
-    // 10. Fetch ALL Submissions Log (Cloud Firestore + Local Storage + Demo Seed Fallback)
+    // 9. Save Test Attempt (Source of Truth: Firestore 'test_attempts' collection)
+    saveSubmission: async (attemptData) => {
+        if (isFirebaseConnected && db) {
+            try {
+                const attemptId = attemptData.id || ('SUB-' + Date.now().toString(36).toUpperCase());
+                const normalizedAttempt = {
+                    ...attemptData,
+                    id: attemptId
+                };
+                const subRef = doc(db, 'test_attempts', attemptId);
+                await setDoc(subRef, normalizedAttempt);
+                console.log('[Firestore Engine] Saved test attempt to Cloud Firestore test_attempts:', attemptId);
+                return normalizedAttempt;
+            } catch (err) {
+                console.error('[Firestore Engine] Error saving test attempt to Firestore:', err.message);
+                throw err;
+            }
+        }
+        throw new Error('Firestore database is not connected.');
+    },
+
+    // 10. Fetch Test Attempts Log (Source of Truth: Firestore 'test_attempts' collection)
     getSubmissions: async (studentId = null) => {
-        let firestoreSubs = [];
         if (isFirebaseConnected && db) {
             try {
-                const snapshot = await getDocs(collection(db, 'submissions'));
+                const snapshot = await getDocs(collection(db, 'test_attempts'));
+                let attempts = [];
                 if (!snapshot.empty) {
-                    firestoreSubs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    attempts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
                 }
+
+                if (studentId) {
+                    attempts = attempts.filter(s => 
+                        s.studentId === studentId || 
+                        s.uid === studentId || 
+                        (s.studentEmail && s.studentEmail.toLowerCase() === studentId.toLowerCase())
+                    );
+                }
+                attempts.sort((a, b) => new Date(b.submittedAt || b.createdAt || 0) - new Date(a.submittedAt || a.createdAt || 0));
+                console.log(`[Firestore Engine] Fetched ${attempts.length} test attempts from test_attempts collection.`);
+                return attempts;
             } catch (err) {
-                console.warn('[Firestore Engine] Error fetching submissions:', err.message);
+                console.error('[Firestore Engine] Error fetching test attempts from Firestore:', err.message);
+                return [];
             }
         }
-        const localSubs = storageService.getSubmissions(null);
-
-        const combined = [...firestoreSubs];
-        localSubs.forEach(ls => {
-            if (!combined.some(cs => cs.id === ls.id)) {
-                combined.push(ls);
-            }
-        });
-
-        if (combined.length === 0) {
-            const demoSubmissions = [
-                {
-                    id: 'sub_1001',
-                    studentId: 'std_102',
-                    studentName: 'Rahul Patil',
-                    studentEmail: 'rahul@sigma.com',
-                    examId: 'police_bharti',
-                    examCode: 'PB-MOCK',
-                    examName: 'Maharashtra Police Bharti Mock',
-                    submittedAt: new Date(Date.now() - 1000 * 3600 * 2).toISOString(),
-                    timeTakenSeconds: 3420,
-                    finalScore: 82,
-                    totalMarks: 100,
-                    percentage: 82.0,
-                    accuracy: 88.5,
-                    passed: true
-                },
-                {
-                    id: 'sub_1002',
-                    studentId: 'std_101',
-                    studentName: 'Alex Student',
-                    studentEmail: 'student@sigma.com',
-                    examId: 'ssc_gd',
-                    examCode: 'SSC-GD-CBT',
-                    examName: 'SSC GD Constable Mock',
-                    submittedAt: new Date(Date.now() - 1000 * 3600 * 24).toISOString(),
-                    timeTakenSeconds: 3100,
-                    finalScore: 118,
-                    totalMarks: 160,
-                    percentage: 73.8,
-                    accuracy: 81.2,
-                    passed: true
-                }
-            ];
-            demoSubmissions.forEach(ds => combined.push(ds));
-        }
-
-        let filtered = combined;
-        if (studentId) {
-            filtered = filtered.filter(s => 
-                s.studentId === studentId || 
-                s.uid === studentId || 
-                (s.studentEmail && s.studentEmail.toLowerCase() === studentId.toLowerCase())
-            );
-        }
-        filtered.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-        return filtered;
+        return [];
     },
 
-    // 11. Save Package Purchase Request (UPI QR + UTR Ref No with Unique Validation)
+    // 11. Course Packages Management (Source of Truth: Firestore 'packages' collection)
+    getPackages: async () => {
+        if (isFirebaseConnected && db) {
+            try {
+                const snapshot = await getDocs(collection(db, 'packages'));
+                if (!snapshot.empty) {
+                    const pkgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    console.log(`[Firestore Engine] Fetched ${pkgs.length} packages from Cloud Firestore.`);
+                    return pkgs;
+                }
+                return [];
+            } catch (err) {
+                console.error('[Firestore Engine] Error fetching packages from Firestore:', err.message);
+                return [];
+            }
+        }
+        return [];
+    },
+
+    savePackage: async (packageData) => {
+        if (isFirebaseConnected && db) {
+            try {
+                const pkgId = packageData.id || ('pkg_' + Date.now());
+                const normalized = {
+                    ...packageData,
+                    id: pkgId,
+                    createdAt: packageData.createdAt || new Date().toISOString()
+                };
+                await setDoc(doc(db, 'packages', pkgId), normalized, { merge: true });
+                console.log('[Firestore Engine] Saved package to Cloud Firestore:', pkgId);
+                return normalized;
+            } catch (err) {
+                console.error('[Firestore Engine] Error saving package to Firestore:', err.message);
+                throw err;
+            }
+        }
+        throw new Error('Firestore database is not connected.');
+    },
+
+    deletePackage: async (packageId) => {
+        if (isFirebaseConnected && db) {
+            try {
+                await deleteDoc(doc(db, 'packages', packageId));
+                console.log('[Firestore Engine] Deleted package from Firestore:', packageId);
+                return { success: true };
+            } catch (err) {
+                console.error('[Firestore Engine] Error deleting package from Firestore:', err.message);
+                throw err;
+            }
+        }
+        throw new Error('Firestore database is not connected.');
+    },
+
+    // 12. Package Purchase Requests (Source of Truth: Firestore 'package_requests' collection)
     savePackagePurchaseRequest: async (requestData) => {
         const cleanUtr = String(requestData.utrNumber || '').trim();
         const existingReqs = await firestoreEngine.getPackagePurchaseRequests();
@@ -381,22 +379,20 @@ export const firestoreEngine = {
 
         if (isFirebaseConnected && db) {
             try {
-                const reqRef = doc(db, 'package_requests', requestData.id);
-                await setDoc(reqRef, requestData);
-                console.log('[Firestore Engine] Saved package purchase request:', requestData.id);
+                const reqId = requestData.id || ('req_' + Date.now());
+                const normalized = { ...requestData, id: reqId, createdAt: new Date().toISOString() };
+                const reqRef = doc(db, 'package_requests', reqId);
+                await setDoc(reqRef, normalized);
+                console.log('[Firestore Engine] Saved package purchase request to Cloud Firestore:', reqId);
+                return { success: true, request: normalized };
             } catch (err) {
-                console.warn('[Firestore Engine] Firestore request save fallback:', err.message);
+                console.error('[Firestore Engine] Error saving package purchase request:', err.message);
+                throw err;
             }
         }
-
-        const local = localStorage.getItem('sigma_package_requests');
-        const list = local ? JSON.parse(local) : [];
-        list.unshift(requestData);
-        localStorage.setItem('sigma_package_requests', JSON.stringify(list));
-        return { success: true };
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 12. Fetch Package Purchase Requests
     getPackagePurchaseRequests: async () => {
         if (isFirebaseConnected && db) {
             try {
@@ -406,30 +402,16 @@ export const firestoreEngine = {
                     reqs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                     return reqs;
                 }
+                return [];
             } catch (err) {
-                console.warn('[Firestore Engine] Error fetching package requests:', err.message);
+                console.error('[Firestore Engine] Error fetching package requests:', err.message);
+                return [];
             }
         }
-        const local = localStorage.getItem('sigma_package_requests');
-        return local ? JSON.parse(local) : [
-            {
-                id: 'req_101',
-                studentId: 'std_102',
-                studentName: 'Rahul Patil',
-                studentMobile: '9876543210',
-                packageName: 'Police Batch – 100 Tests',
-                targetExam: 'Police Bharti',
-                testQuota: 100,
-                amount: 199,
-                utrNumber: '422198034120',
-                senderUpi: 'rahul@ybl',
-                status: 'pending',
-                createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString()
-            }
-        ];
+        return [];
     },
 
-    // 13. Approve Package Purchase Request (Credits Package & Test Quota)
+    // 13. Approve Package Purchase Request (Credits Package & Test Quota in Firestore)
     approvePackagePurchaseRequest: async (requestId) => {
         const requests = await firestoreEngine.getPackagePurchaseRequests();
         const req = requests.find(r => r.id === requestId);
@@ -439,93 +421,114 @@ export const firestoreEngine = {
 
         if (isFirebaseConnected && db) {
             try {
-                await setDoc(doc(db, 'package_requests', requestId), updatedReq);
-            } catch (e) {
-                console.warn('[Firestore Engine] Error updating request status:', e.message);
-            }
-        }
+                await setDoc(doc(db, 'package_requests', requestId), updatedReq, { merge: true });
 
-        const local = localStorage.getItem('sigma_package_requests');
-        const list = local ? JSON.parse(local) : [];
-        const nextList = list.map(r => r.id === requestId ? updatedReq : r);
-        localStorage.setItem('sigma_package_requests', JSON.stringify(nextList));
+                const student = await firestoreEngine.getUserProfile(req.studentId);
+                if (student) {
+                    const newPkg = {
+                        packageName: req.packageName,
+                        exam: req.targetExam,
+                        purchaseDate: new Date().toLocaleDateString('en-IN'),
+                        expiry: '12 Months',
+                        paymentStatus: 'Paid',
+                        utrNumber: req.utrNumber
+                    };
+                    const currentPkgs = student.purchasedPackages || [];
+                    const nextPkgs = [...currentPkgs, newPkg];
+                    const nextAllowed = (student.allowedTests || 0) + (req.testQuota || 100);
+                    const nextRemaining = (student.remainingTests || 0) + (req.testQuota || 100);
 
-        const allStudents = await firestoreEngine.getStudents();
-        const student = allStudents.find(s => s.id === req.studentId || s.uid === req.studentId || s.email === req.studentEmail);
+                    const updatedStudent = {
+                        ...student,
+                        purchasedPackages: nextPkgs,
+                        allowedTests: nextAllowed,
+                        remainingTests: nextRemaining,
+                        updatedAt: new Date().toISOString()
+                    };
 
-        if (student) {
-            const newPkg = {
-                packageName: req.packageName,
-                exam: req.targetExam,
-                purchaseDate: new Date().toLocaleDateString('en-IN'),
-                expiry: '12 Months',
-                paymentStatus: 'Paid',
-                utrNumber: req.utrNumber
-            };
-            const currentPkgs = student.purchasedPackages || [];
-            const nextPkgs = [...currentPkgs, newPkg];
-            const nextAllowed = (student.allowedTests || 0) + (req.testQuota || 100);
-            const nextRemaining = (student.remainingTests || 0) + (req.testQuota || 100);
+                    await setDoc(doc(db, 'users', student.uid || student.id), updatedStudent, { merge: true });
 
-            const updatedStudent = {
-                ...student,
-                purchasedPackages: nextPkgs,
-                allowedTests: nextAllowed,
-                remainingTests: nextRemaining
-            };
-
-            const localList = storageService.getStudents();
-            const nextLocal = localList.map(s => (s.id === student.id || s.email === student.email) ? updatedStudent : s);
-            if (!nextLocal.some(s => s.id === student.id)) nextLocal.push(updatedStudent);
-            localStorage.setItem('cep_react_students', JSON.stringify(nextLocal));
-            localStorage.setItem('sigma_students', JSON.stringify(nextLocal));
-
-            const currUser = storageService.getCurrentUser();
-            if (currUser && (currUser.id === student.id || currUser.email === student.email)) {
-                storageService.setCurrentUser(updatedStudent);
-            }
-
-            if (isFirebaseConnected && db) {
-                try {
-                    await setDoc(doc(db, 'users', student.id || student.uid), updatedStudent);
-                } catch (e) {
-                    console.warn('[Firestore Engine] User profile credit update error:', e.message);
+                    const currUser = storageService.getCurrentUser();
+                    if (currUser && (currUser.id === student.id || currUser.uid === student.uid)) {
+                        storageService.setCurrentUser(updatedStudent);
+                    }
                 }
+                return { success: true };
+            } catch (e) {
+                console.error('[Firestore Engine] Error approving request:', e.message);
+                throw e;
             }
         }
-
-        return { success: true };
+        throw new Error('Firestore database is not connected.');
     },
 
     // 14. Reject Package Purchase Request
     rejectPackagePurchaseRequest: async (requestId) => {
-        const requests = await firestoreEngine.getPackagePurchaseRequests();
-        const req = requests.find(r => r.id === requestId);
-        if (!req) return { success: false, message: 'Request not found.' };
-
-        const updatedReq = { ...req, status: 'rejected', rejectedAt: new Date().toISOString() };
-
         if (isFirebaseConnected && db) {
             try {
-                await setDoc(doc(db, 'package_requests', requestId), updatedReq);
+                const reqRef = doc(db, 'package_requests', requestId);
+                const snap = await getDoc(reqRef);
+                if (!snap.exists()) return { success: false, message: 'Request not found.' };
+
+                const updatedReq = { ...snap.data(), status: 'rejected', rejectedAt: new Date().toISOString() };
+                await setDoc(reqRef, updatedReq, { merge: true });
+                return { success: true };
             } catch (e) {
-                console.warn('[Firestore Engine] Error rejecting request:', e.message);
+                console.error('[Firestore Engine] Error rejecting request:', e.message);
+                throw e;
+            }
+        }
+        throw new Error('Firestore database is not connected.');
+    },
+
+    // 14a-i. Create a real Razorpay order server-side (/api/razorpay/create-order).
+    // The Key Secret never reaches the browser — this just returns the order id
+    // and public Key ID needed to open the checkout popup.
+    createRazorpayOrder: async ({ amount, packageId }) => {
+        const res = await fetch('/api/razorpay/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount, packageId })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data?.error || 'Could not create Razorpay order.');
+        }
+        return data;
+    },
+
+    // 14a-ii. Verify a completed Razorpay payment server-side
+    // (/api/razorpay/verify-payment) and credit quota only if the HMAC
+    // signature genuinely came from Razorpay — replaces the old pattern of
+    // crediting quota directly from a client-side Firestore write.
+    verifyRazorpayPayment: async ({ orderId, paymentId, signature, student, pkg, amount }) => {
+        const res = await fetch('/api/razorpay/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, paymentId, signature, student, pkg, amount })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            const currUser = storageService.getCurrentUser();
+            const studentId = student.uid || student.id;
+            if (currUser && (currUser.id === studentId || currUser.uid === studentId)) {
+                storageService.setCurrentUser(data.user);
             }
         }
 
-        const local = localStorage.getItem('sigma_package_requests');
-        const list = local ? JSON.parse(local) : [];
-        const nextList = list.map(r => r.id === requestId ? updatedReq : r);
-        localStorage.setItem('sigma_package_requests', JSON.stringify(nextList));
-
-        return { success: true };
+        return data;
     },
 
-    // 14. Process Instant Razorpay Payment Success & Credit Student Quota
+    // 14b. Process Instant Razorpay Payment Success & Credit Student Quota
+    // NOTE: only used by the client-side "Simulate Instant Quota Credit" test
+    // button (no real payment involved). Real payments go through
+    // verifyRazorpayPayment above, which credits quota server-side.
     processRazorpayPaymentSuccess: async ({ student, pkg, paymentId, amount }) => {
-        const studentId = student.id || student.uid;
-        const currentRemaining = Number(student.remainingTests || 0);
-        const currentAllowed = Number(student.allowedTests || 0);
+        const studentId = student.uid || student.id;
+        const profile = await firestoreEngine.getUserProfile(studentId);
+        const currentRemaining = Number(profile?.remainingTests || student.remainingTests || 0);
+        const currentAllowed = Number(profile?.allowedTests || student.allowedTests || 0);
         const addedQuota = Number(pkg.totalTests || 10);
 
         const newPurchasedPackage = {
@@ -542,25 +545,15 @@ export const firestoreEngine = {
         };
 
         const updatedStudent = {
-            ...student,
+            ...(profile || student),
+            uid: studentId,
+            id: studentId,
             remainingTests: currentRemaining + addedQuota,
             allowedTests: currentAllowed + addedQuota,
-            purchasedPackages: [...(student.purchasedPackages || []), newPurchasedPackage]
+            purchasedPackages: [...((profile?.purchasedPackages || student.purchasedPackages) || []), newPurchasedPackage],
+            updatedAt: new Date().toISOString()
         };
 
-        // 1. Update localStorage student list
-        const localStudents = await firestoreEngine.getStudents();
-        const nextLocal = localStudents.map(s => (s.id === studentId || s.email === student.email ? updatedStudent : s));
-        localStorage.setItem('cep_react_students', JSON.stringify(nextLocal));
-        localStorage.setItem('sigma_students', JSON.stringify(nextLocal));
-
-        // 2. Update current logged-in user in session
-        const currUser = storageService.getCurrentUser();
-        if (currUser && (currUser.id === studentId || currUser.email === student.email)) {
-            storageService.setCurrentUser(updatedStudent);
-        }
-
-        // 3. Log transaction request in Cloud Firestore / localStorage
         const requestData = {
             id: 'req_rzp_' + Date.now(),
             studentId: studentId,
@@ -573,7 +566,7 @@ export const firestoreEngine = {
             testQuota: addedQuota,
             amount: amount || pkg.discountPrice || pkg.price,
             paymentMethod: 'Razorpay',
-            utrNumber: paymentId, // Log Razorpay Payment ID as UTR reference
+            utrNumber: paymentId,
             razorpayPaymentId: paymentId,
             status: 'approved',
             createdAt: new Date().toISOString(),
@@ -582,29 +575,32 @@ export const firestoreEngine = {
 
         if (isFirebaseConnected && db) {
             try {
-                await setDoc(doc(db, 'users', studentId), updatedStudent);
+                await setDoc(doc(db, 'users', studentId), updatedStudent, { merge: true });
                 await setDoc(doc(db, 'package_requests', requestData.id), requestData);
+
+                const currUser = storageService.getCurrentUser();
+                if (currUser && (currUser.id === studentId || currUser.uid === studentId)) {
+                    storageService.setCurrentUser(updatedStudent);
+                }
+
+                return {
+                    success: true,
+                    user: updatedStudent,
+                    message: `Payment Successful! ${addedQuota} Tests credited instantly to your account.`
+                };
             } catch (e) {
-                console.warn('[Firestore Engine] Razorpay Firestore credit error:', e.message);
+                console.error('[Firestore Engine] Razorpay Firestore credit error:', e.message);
+                throw e;
             }
         }
-
-        const localReqs = localStorage.getItem('sigma_package_requests');
-        const reqList = localReqs ? JSON.parse(localReqs) : [];
-        reqList.unshift(requestData);
-        localStorage.setItem('sigma_package_requests', JSON.stringify(reqList));
-
-        return {
-            success: true,
-            user: updatedStudent,
-            message: `Payment Successful! ${addedQuota} Tests credited instantly to your account.`
-        };
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 15. Admin Merchant Payment Settings (Razorpay Key ID & UPI Config)
+    // 15. Admin Merchant Payment Settings (Source of Truth: Firestore 'settings/payment' document)
     getMerchantPaymentSettings: async () => {
         const envKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RAZORPAY_KEY_ID) ? import.meta.env.VITE_RAZORPAY_KEY_ID : '';
-        
+        const DEFAULT_KEY = 'rzp_test_E66NI3Yg44x1mj';
+
         const resolveKey = (adminSavedKey) => {
             if (adminSavedKey && adminSavedKey.trim() && adminSavedKey.trim() !== 'rzp_test_sigmaforce2026') {
                 return adminSavedKey.trim();
@@ -612,7 +608,7 @@ export const firestoreEngine = {
             if (envKey && envKey.trim() && envKey.trim() !== 'rzp_test_sigmaforce2026') {
                 return envKey.trim();
             }
-            return adminSavedKey?.trim() || envKey?.trim() || 'rzp_test_sigmaforce2026';
+            return DEFAULT_KEY;
         };
 
         if (isFirebaseConnected && db) {
@@ -629,31 +625,36 @@ export const firestoreEngine = {
                     };
                 }
             } catch (e) {
-                console.warn('[Firestore Engine] Payment settings fallback:', e.message);
+                console.error('[Firestore Engine] Error getting merchant payment settings:', e.message);
             }
         }
-        const local = localStorage.getItem('sigma_merchant_payment_settings');
-        const parsed = local ? JSON.parse(local) : null;
         return {
-            merchantName: parsed?.merchantName || 'SigmaForce CEP Official',
-            upiId: parsed?.upiId || 'sigmaforce@upi',
-            qrImageUrl: parsed?.qrImageUrl || 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR',
-            razorpayKeyId: resolveKey(parsed?.razorpayKeyId)
+            merchantName: 'SigmaForce CEP Official',
+            upiId: 'sigmaforce@upi',
+            qrImageUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=sigmaforce@upi%26pn=SigmaForce%26cu=INR',
+            razorpayKeyId: resolveKey('')
         };
     },
 
     saveMerchantPaymentSettings: async (settings) => {
         if (isFirebaseConnected && db) {
             try {
-                await setDoc(doc(db, 'settings', 'payment'), settings);
+                const normalized = {
+                    ...settings,
+                    updatedAt: new Date().toISOString()
+                };
+                await setDoc(doc(db, 'settings', 'payment'), normalized);
+                console.log('[Firestore Engine] Saved merchant payment settings to Firestore doc settings/payment');
+                return normalized;
             } catch (e) {
-                console.warn('[Firestore Engine] Error saving payment settings:', e.message);
+                console.error('[Firestore Engine] Error saving payment settings to Firestore:', e.message);
+                throw e;
             }
         }
-        localStorage.setItem('sigma_merchant_payment_settings', JSON.stringify(settings));
+        throw new Error('Firestore database is not connected.');
     },
 
-    // 15. Reset ALL Existing Student Quotas to Zero
+    // 16. Reset ALL Existing Student Quotas to Zero
     resetAllStudentQuotasToZero: async () => {
         if (isFirebaseConnected && db) {
             try {
@@ -661,34 +662,14 @@ export const firestoreEngine = {
                 if (!snapshot.empty) {
                     const updates = snapshot.docs
                         .filter(d => d.data().role !== 'admin')
-                        .map(d => updateDoc(doc(db, 'users', d.id), { allowedTests: 0, remainingTests: 0 }));
+                        .map(d => updateDoc(doc(db, 'users', d.id), { allowedTests: 0, remainingTests: 0, updatedAt: new Date().toISOString() }));
                     await Promise.all(updates);
                     console.log(`[Firestore Engine] Reset ${updates.length} student quotas to 0 in Cloud Firestore.`);
                 }
             } catch (err) {
-                console.warn('[Firestore Engine] Error resetting Firestore student quotas:', err.message);
+                console.error('[Firestore Engine] Error resetting Firestore student quotas:', err.message);
+                throw err;
             }
         }
-
-        const students = storageService.getStudents();
-        const resetList = students.map(s => ({
-            ...s,
-            allowedTests: 0,
-            remainingTests: 0
-        }));
-
-        localStorage.setItem('cep_react_students', JSON.stringify(resetList));
-        localStorage.setItem('sigma_students', JSON.stringify(resetList));
-
-        const currUser = storageService.getCurrentUser();
-        if (currUser && currUser.role === 'student') {
-            storageService.setCurrentUser({
-                ...currUser,
-                allowedTests: 0,
-                remainingTests: 0
-            });
-        }
-
-        return resetList;
     }
 };

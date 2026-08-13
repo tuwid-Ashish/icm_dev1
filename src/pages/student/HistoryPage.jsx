@@ -13,8 +13,8 @@ export const HistoryPage = ({ onViewResult }) => {
     useEffect(() => {
         let isMounted = true;
         async function loadSubmissions() {
-            setLoading(true);
-            const loaded = await firestoreEngine.getSubmissions(user?.id || 'std_101');
+            const uid = user ? (user.uid || user.id) : null;
+            const loaded = uid ? await firestoreEngine.getSubmissions(uid) : [];
             if (isMounted) {
                 setSubmissions(loaded);
                 setLoading(false);

@@ -3,6 +3,7 @@
  * Supports Full Mock Papers and Random Subject Practice papers with Fisher-Yates Randomization.
  */
 
+import { firestoreEngine } from './firestoreEngine.js';
 import { storageService } from './storageService.js';
 
 class ExamEngine {
@@ -18,14 +19,15 @@ class ExamEngine {
         return shuffled;
     }
 
-    generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20, studentInfo = {}) {
-        const exam = storageService.getExamById(examId);
+    async generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20, studentInfo = {}) {
+        const exams = await firestoreEngine.getExams();
+        const exam = exams.find(e => e.id === examId);
         if (!exam) {
             return { error: 'Invalid exam selected.' };
         }
 
         // Engine-side Paywall & Quota Verification
-        const currentUser = storageService.getCurrentUser();
+        const currentUser = await firestoreEngine.getUserProfile(studentId) || storageService.getCurrentUser();
         const isFree = exam.isFreeTest || false;
 
         if (!isFree) {
@@ -35,30 +37,64 @@ class ExamEngine {
             }
         }
 
-        const allQuestions = storageService.getQuestions();
-        const examBatchName = exam.name.includes('Police') ? 'Police Bharti' :
-                            exam.name.includes('Forest') || exam.name.includes('Vanrakshak') ? 'Vanrakshak' :
-                            exam.name.includes('SSC') ? 'SSC GD' : '';
+        const allQuestions = await firestoreEngine.getQuestions();
+        const examNameLower = (exam.name || '').toLowerCase();
+        const examIdLower = (exam.id || '').toLowerCase();
 
-        let batchQuestions = allQuestions.filter(q => 
-            q.batch === examBatchName || 
-            q.batch.toLowerCase().includes(exam.id) ||
-            q.batch.toLowerCase().includes(exam.code.toLowerCase())
-        );
+        // 1. Filter Questions for the target Exam Batch
+        let batchQuestions = allQuestions.filter(q => {
+            if (Array.isArray(q.batches)) {
+                if (q.batches.includes('ALL') || q.batches.includes('All Batches')) return true;
+                if (q.batches.some(b => {
+                    const bl = String(b).toLowerCase();
+                    return examNameLower.includes(bl) || bl.includes(examIdLower);
+                })) return true;
+            }
+            if (q.batch) {
+                const bStr = String(q.batch).toLowerCase();
+                if (bStr.includes('all')) return true;
+                if (examNameLower.includes('police') && bStr.includes('police')) return true;
+                if ((examNameLower.includes('vanrakshak') || examNameLower.includes('forest')) && (bStr.includes('vanrakshak') || bStr.includes('forest'))) return true;
+                if (examNameLower.includes('ssc') && bStr.includes('ssc')) return true;
+                if (bStr.includes(examIdLower)) return true;
+            }
+            return true;
+        });
 
         if (batchQuestions.length === 0) {
             batchQuestions = allQuestions;
         }
 
-        // Apply Subject Filter if Random Subject Practice Mode selected
+        // 2. Filter Questions for the target Subject if specified (e.g. Mathematics)
         if (subjectFilter && subjectFilter !== 'ALL') {
-            const matched = batchQuestions.filter(q => 
-                q.subject.toLowerCase().includes(subjectFilter.toLowerCase()) ||
-                subjectFilter.toLowerCase().includes(q.subject.toLowerCase())
-            );
-            if (matched.length > 0) {
-                batchQuestions = matched;
-            }
+            const sfLower = subjectFilter.toLowerCase();
+            const matched = batchQuestions.filter(q => {
+                const qSub = (q.subject || '').toLowerCase();
+                if (qSub === sfLower || qSub.includes(sfLower) || sfLower.includes(qSub)) return true;
+
+                const isMathFilter = sfLower.includes('math') || sfLower.includes('अंकगणित') || sfLower.includes('गणित');
+                const isMathQ = qSub.includes('math') || qSub.includes('अंकगणित') || qSub.includes('गणित');
+                if (isMathFilter && isMathQ) return true;
+
+                const isReasoningFilter = sfLower.includes('reasoning') || sfLower.includes('intel') || sfLower.includes('बुद्धिमत्ता');
+                const isReasoningQ = qSub.includes('reasoning') || qSub.includes('intel') || qSub.includes('बुद्धिमत्ता');
+                if (isReasoningFilter && isReasoningQ) return true;
+
+                const isGkFilter = sfLower.includes('gk') || sfLower.includes('general') || sfLower.includes('सामान्य');
+                const isGkQ = qSub.includes('gk') || qSub.includes('general') || qSub.includes('सामान्य');
+                if (isGkFilter && isGkQ) return true;
+
+                const isLangFilter = sfLower.includes('marathi') || sfLower.includes('english') || sfLower.includes('मराठी');
+                const isLangQ = qSub.includes('marathi') || qSub.includes('english') || qSub.includes('मराठी');
+                if (isLangFilter && isLangQ) return true;
+
+                return false;
+            });
+            batchQuestions = matched;
+        }
+
+        if (batchQuestions.length === 0) {
+            return { error: `No question paper items found for selected subject "${subjectFilter}". Please select All Subjects or add questions in Question Bank.` };
         }
 
         // Perform Fisher-Yates True Randomization
@@ -140,6 +176,8 @@ class ExamEngine {
                 id: q.id,
                 sectionName: q.subject || 'General Section',
                 text: q.text,
+                imageUrl: q.imageUrl || null,
+                questionImages: q.questionImages || [],
                 options: q.options,
                 userAnswerIndex: userAnsIdx !== undefined ? userAnsIdx : null,
                 correctIndex: q.correctIndex,

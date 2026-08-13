@@ -39,14 +39,14 @@ export const ExamCatalogPage = () => {
         setModalOpen(true);
     };
 
-    const handleLaunchTest = () => {
+    const handleLaunchTest = async () => {
         if (!selectedExam) return;
         setModalOpen(false);
         const subj = testMode === 'subject' ? selectedSubject : 'ALL';
-        const studentId = user?.id || user?.uid || 'std_101';
+        const studentId = user ? (user.uid || user.id) : null;
         const studentName = user?.name || 'Student User';
         const studentEmail = user?.email || 'student@sigma.com';
-        const res = startPracticeTest(studentId, selectedExam.id, subj, undefined, { studentName, studentEmail });
+        const res = await startPracticeTest(studentId, selectedExam.id, subj, undefined, { studentName, studentEmail });
         if (res?.error) alert(res.error);
     };
 

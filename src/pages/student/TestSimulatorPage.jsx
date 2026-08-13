@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useExam } from '../../context/ExamContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
+import { MathRenderer } from '../../components/common/MathRenderer.jsx';
 
 export const TestSimulatorPage = () => {
     const { 
@@ -92,7 +93,7 @@ export const TestSimulatorPage = () => {
 
                         <div className="q-box" style={{ marginBottom: '2rem' }}>
                             <div style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1.5rem', lineHeight: 1.6 }}>
-                                {q.text}
+                                <MathRenderer text={q.text} imageUrl={q.imageUrl} images={q.questionImages} />
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -100,13 +101,15 @@ export const TestSimulatorPage = () => {
                                     const isSelected = userAns === optIdx;
                                     const labelLetter = String.fromCharCode(65 + optIdx);
                                     return (
-                                        <div 
+                                        <div
                                             key={optIdx}
                                             className={`opt-card ${isSelected ? 'selected' : ''}`}
                                             onClick={() => updateAnswer(q.id, optIdx)}
                                         >
                                             <div className="opt-tag">{labelLetter}</div>
-                                            <div style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{optText}</div>
+                                            <div style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>
+                                                <MathRenderer text={optText} />
+                                            </div>
                                         </div>
                                     );
                                 })}

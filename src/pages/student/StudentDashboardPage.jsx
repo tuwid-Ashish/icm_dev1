@@ -27,22 +27,22 @@ export const StudentDashboardPage = ({ onNavigate }) => {
 
     const loadDashboardData = async () => {
         setLoading(true);
-        const uid = user ? (user.id || user.uid) : 'std_101';
+        const uid = user ? (user.id || user.uid) : null;
         
-        const profile = await firestoreEngine.getUserProfile(uid);
-        setUserProfile(profile);
+        if (uid) {
+            const profile = await firestoreEngine.getUserProfile(uid);
+            setUserProfile(profile);
+        } else {
+            setUserProfile(null);
+        }
 
         const loadedExams = await firestoreEngine.getExams();
         setExams(loadedExams);
 
-        const localPkgs = localStorage.getItem('sigma_course_packages');
-        const loadedPkgs = localPkgs ? JSON.parse(localPkgs) : [
-            { id: 'pkg_1', name: 'Police Batch – 100 Tests', exam: 'Police Bharti', totalTests: 100, price: 299, discountPrice: 199, validity: '12 Months', status: 'active' },
-            { id: 'pkg_2', name: 'SSC GD – 100 Tests', exam: 'SSC GD', totalTests: 100, price: 299, discountPrice: 199, validity: '12 Months', status: 'active' }
-        ];
+        const loadedPkgs = await firestoreEngine.getPackages();
         setPackages(loadedPkgs.filter(p => p.status === 'active'));
 
-        const subs = await firestoreEngine.getSubmissions(uid);
+        const subs = uid ? await firestoreEngine.getSubmissions(uid) : [];
         setSubmissions(subs);
 
         setLoading(false);
@@ -87,15 +87,15 @@ export const StudentDashboardPage = ({ onNavigate }) => {
         setPurchaseModalOpen(true);
     };
 
-    const handleLaunchTest = () => {
+    const handleLaunchTest = async () => {
         if (!selectedExam) return;
         setModalOpen(false);
         const subj = testMode === 'subject' ? selectedSubject : 'ALL';
-        const studentId = user?.id || user?.uid || (userProfile ? (userProfile.id || userProfile.uid) : 'std_101');
+        const studentId = user ? (user.uid || user.id) : (userProfile ? (userProfile.uid || userProfile.id) : null);
         const studentName = user?.name || userProfile?.name || 'Student User';
         const studentEmail = user?.email || userProfile?.email || 'student@sigma.com';
 
-        const res = startPracticeTest(studentId, selectedExam.id, subj, undefined, { studentName, studentEmail });
+        const res = await startPracticeTest(studentId, selectedExam.id, subj, undefined, { studentName, studentEmail });
         if (res?.error) alert(res.error);
     };
 

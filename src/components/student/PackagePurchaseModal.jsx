@@ -31,7 +31,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                     setPaymentConfig({
                         merchantName: cfg.merchantName || 'SigmaForce CEP Official',
                         upiId: cfg.upiId || 'sigmaforce@upi',
-                        razorpayKeyId: cfg.razorpayKeyId || 'rzp_test_sigmaforce2026',
+                        razorpayKeyId: cfg.razorpayKeyId || 'rzp_test_E66NI3Yg44x1mj',
                         qrImageUrl: cfg.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=${encodeURIComponent(cfg.upiId || 'sigmaforce@upi')}%26pn=${encodeURIComponent(cfg.merchantName || 'SigmaForce')}%26cu=INR`
                     });
                 }
@@ -56,26 +56,31 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     const amountToPay = pkg.discountPrice || pkg.price;
     const qrSource = paymentConfig.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=${encodeURIComponent(paymentConfig.upiId)}%26pn=${encodeURIComponent(paymentConfig.merchantName)}%26cu=INR`;
 
-    // Trigger Official Razorpay Gateway Popup
-    const handleRazorpayPayment = () => {
+    // Trigger Official Razorpay Gateway Popup — order is created server-side
+    // (/api/razorpay/create-order) so the Key Secret never touches the browser,
+    // and the resulting order_id lets us cryptographically verify the payment
+    // afterwards instead of trusting whatever the client-side handler receives.
+    const handleRazorpayPayment = async () => {
         setErrorMessage('');
         setLoading(true);
 
-        const currentKey = paymentConfig.razorpayKeyId || 'rzp_test_E66NI3Yg44x1mj';
-        console.log("");
-        
-
-        // Check if using default non-registered placeholder key
-        if (currentKey === 'rzp_test_sigmaforce2026' || currentKey.length < 14) {
+        let order;
+        try {
+            order = await firestoreEngine.createRazorpayOrder({
+                amount: amountToPay,
+                packageId: pkg.id
+            });
+        } catch (err) {
             setLoading(false);
-            setErrorMessage('Razorpay Key Notice: "rzp_test_sigmaforce2026" is a placeholder key. To test real Razorpay popups, enter your official Key ID from dashboard.razorpay.com in Admin Settings or .env file. Or click "⚡ Instant Test Payment" below to test quota crediting.');
+            setErrorMessage('Could not start checkout: ' + (err.message || 'Server order creation failed.'));
             return;
         }
 
         const options = {
-            key: currentKey,
-            amount: amountToPay * 100, // Amount in paise
-            currency: 'INR',
+            key: order.keyId,
+            order_id: order.orderId,
+            amount: order.amount, // paise, from the server-created order
+            currency: order.currency,
             name: paymentConfig.merchantName || 'SigmaForce CEP Official',
             description: `${pkg.name} (${pkg.totalTests} Tests)`,
             image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
@@ -88,24 +93,25 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                 color: '#ea580c'
             },
             handler: async function (response) {
-                const paymentId = response.razorpay_payment_id || ('pay_' + Date.now());
-                const res = await firestoreEngine.processRazorpayPaymentSuccess({
+                const res = await firestoreEngine.verifyRazorpayPayment({
+                    orderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
                     student: user,
                     pkg,
-                    paymentId,
                     amount: amountToPay
                 });
                 setLoading(false);
 
                 if (res.success) {
-                    setSuccessPaymentId(paymentId);
+                    setSuccessPaymentId(response.razorpay_payment_id);
                     setSuccessMessage(t('quota_credited_msg'));
                     setTimeout(() => {
                         if (onSuccess) onSuccess(res.user);
                         onClose();
                     }, 3000);
                 } else {
-                    setErrorMessage('Payment verification failed.');
+                    setErrorMessage(res.error || 'Payment verification failed.');
                 }
             },
             modal: {
@@ -129,7 +135,8 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                 setErrorMessage('Razorpay Popup Error: ' + (err.message || 'Could not open gateway popup. Check Key ID in Admin Settings.'));
             }
         } else {
-            handleSimulatedPayment();
+            setLoading(false);
+            setErrorMessage('Razorpay checkout script did not load. Use "Simulate Instant Quota Credit" for sandbox testing instead.');
         }
     };
 

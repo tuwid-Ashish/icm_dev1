@@ -1,13 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useExam } from '../../context/ExamContext.jsx';
-import { storageService } from '../../services/storageService.js';
+import { firestoreEngine } from '../../services/firestoreEngine.js';
 
 export const StudentDashboard = ({ onStartTest, onViewResult }) => {
     const { user } = useAuth();
     const { startPracticeTest } = useExam();
-    const exams = storageService.getExams();
-    const submissions = storageService.getStudentSubmissions(user.id);
+    const [exams, setExams] = useState([]);
+    const [submissions, setSubmissions] = useState([]);
+
+    useEffect(() => {
+        let isMounted = true;
+        async function load() {
+            const loadedExams = await firestoreEngine.getExams();
+            const loadedSubs = user ? await firestoreEngine.getSubmissions(user.uid || user.id) : [];
+            if (isMounted) {
+                setExams(loadedExams);
+                setSubmissions(loadedSubs);
+            }
+        }
+        load();
+        return () => { isMounted = false; };
+    }, [user]);
 
     const totalAttempted = submissions.length;
     const avgScore = totalAttempted > 0 ? (submissions.reduce((s, a) => s + a.percentage, 0) / totalAttempted).toFixed(1) : '0.0';

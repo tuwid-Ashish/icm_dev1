@@ -497,6 +497,43 @@ textarea.form-control { resize: vertical; min-height: 100px; }
     gap: 1.5rem;
 }
 
+/* Question Bank editor: editor fields left, live preview right (sticky) */
+.qb-editor-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.qb-editor-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.qb-preview-col {
+    position: sticky;
+    top: 0;
+    min-width: 0;
+}
+
+.qb-preview-box {
+    background: var(--bg-surface);
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--primary);
+}
+
+@media (max-width: 900px) {
+    .qb-editor-grid {
+        grid-template-columns: 1fr;
+    }
+    .qb-preview-col {
+        position: static;
+    }
+}
+
 .form-grid-2col {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

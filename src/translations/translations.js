@@ -219,7 +219,16 @@ export const translations = {
         sort_oldest_date: "Oldest Submission First",
         student_name_th: "Student Name",
         target_exam_th: "Target Exam",
-        rank_th: "Rank"
+        rank_th: "Rank",
+        refresh_btn: "Refresh Audit Log",
+        your_rank_label: "Your Rank",
+        view_top_rankers: "Top Rankers",
+        comparative_analysis: "Comparative Analysis",
+        topper_score_label: "Topper Score",
+        your_score_label: "Your Score",
+        out_of_aspirants: "out of",
+        aspirants_unit: "Aspirants",
+        top_rankers_title: "Top Rankers Leaderboard"
     },
 
     mr: {
@@ -442,6 +451,15 @@ export const translations = {
         sort_oldest_date: "जुने सबमिशन प्रथम (Oldest Date)",
         student_name_th: "विद्यार्थ्याचे नाव",
         target_exam_th: "लक्ष्य परीक्षा",
-        rank_th: "रँक / स्थान"
+        rank_th: "रँक / स्थान",
+        refresh_btn: "पुन्हा लोड करा",
+        your_rank_label: "तुमचा रँक (Rank)",
+        view_top_rankers: "Top Rankers पहा",
+        comparative_analysis: "तुलनात्मक विश्लेषण (Comparative Analysis)",
+        topper_score_label: "टॉप स्कोर (Topper)",
+        your_score_label: "तुमचे गुण (Your Score)",
+        out_of_aspirants: "एकूण",
+        aspirants_unit: "परीक्षार्थींपैकी",
+        top_rankers_title: "गुणवंत विद्यार्थी रँक लिस्ट (Top Rankers)"
     }
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useExam } from '../../context/ExamContext.jsx';
+import { MathRenderer } from '../common/MathRenderer.jsx';
 
 export const CBTSimulator = () => {
     const { 
@@ -78,21 +79,25 @@ export const CBTSimulator = () => {
                             <span>Question {currentQuestionIdx + 1} of {activeSession.questions.length} ({q.sectionName || 'General'})</span>
                             <span>Marks: +{q.marks || 1} | Neg: -{activeSession.negativeMarkingRate}</span>
                         </div>
-                        <div class="question-card">
-                            <div class="q-text">{q.text}</div>
+                        <div className="question-card">
+                            <div className="q-text">
+                                <MathRenderer text={q.text} imageUrl={q.imageUrl || (q.questionImages && q.questionImages[0]?.url)} />
+                            </div>
 
-                            <div class="options-list">
+                            <div className="options-list">
                                 {q.options.map((optText, optIdx) => {
                                     const isSelected = userAns === optIdx;
                                     const labelLetter = String.fromCharCode(65 + optIdx);
                                     return (
                                         <div 
                                             key={optIdx}
-                                            class={`option-item ${isSelected ? 'selected' : ''}`}
+                                            className={`option-item ${isSelected ? 'selected' : ''}`}
                                             onClick={() => updateAnswer(q.id, optIdx)}
                                         >
-                                            <div class="option-label">{labelLetter}</div>
-                                            <div style={{ fontSize: '1rem' }}>{optText}</div>
+                                            <div className="option-label">{labelLetter}</div>
+                                            <div style={{ fontSize: '1rem' }}>
+                                                <MathRenderer text={optText} />
+                                            </div>
                                         </div>
                                     );
                                 })}

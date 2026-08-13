@@ -78,14 +78,14 @@ export const ExamProvider = ({ children }) => {
     };
 
     // Start Practice Test
-    const startPracticeTest = (studentId, examId, subjectFilter = 'ALL', count, studentInfo) => {
-        const session = generateExamPaper(studentId, examId, subjectFilter, count, studentInfo);
+    const startPracticeTest = async (studentId, examId, subjectFilter = 'ALL', count, studentInfo) => {
+        const session = await generateExamPaper(studentId, examId, subjectFilter, count, studentInfo);
         if (session.error) {
             return session;
         }
 
-        // Decrement quota in Firestore / Storage
-        firestoreEngine.decrementStudentQuota(studentId);
+        // Decrement quota in Firestore
+        await firestoreEngine.decrementStudentQuota(studentId);
         refreshUser();
 
         const durationSecs = session.durationMinutes * 60;

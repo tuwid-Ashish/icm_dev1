@@ -1,10 +1,20 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { storageService } from '../../services/storageService.js';
+import { firestoreEngine } from '../../services/firestoreEngine.js';
 
 export const TestHistoryTable = ({ onViewResult }) => {
     const { user } = useAuth();
-    const submissions = storageService.getStudentSubmissions(user.id);
+    const [submissions, setSubmissions] = useState([]);
+
+    useEffect(() => {
+        let isMounted = true;
+        async function load() {
+            const loadedSubs = user ? await firestoreEngine.getSubmissions(user.uid || user.id) : [];
+            if (isMounted) setSubmissions(loadedSubs);
+        }
+        load();
+        return () => { isMounted = false; };
+    }, [user]);
 
     return (
         <div class="panel">

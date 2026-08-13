@@ -1,10 +1,20 @@
-import React from 'react';
-import { storageService } from '../services/storageService.js';
+import React, { useState, useEffect } from 'react';
+import { firestoreEngine } from '../services/firestoreEngine.js';
 import { useLanguage } from '../context/LanguageContext.jsx';
 
 export const LandingPage = ({ onNavigate }) => {
-    const exams = storageService.getExams();
+    const [exams, setExams] = useState([]);
     const { t } = useLanguage();
+
+    useEffect(() => {
+        let isMounted = true;
+        async function loadExams() {
+            const loaded = await firestoreEngine.getExams();
+            if (isMounted) setExams(loaded);
+        }
+        loadExams();
+        return () => { isMounted = false; };
+    }, []);
 
     return (
         <div>

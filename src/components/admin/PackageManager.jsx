@@ -23,19 +23,19 @@ export const PackageManager = ({ onRefresh }) => {
     // Merchant Payment Settings state
     const [merchantName, setMerchantName] = useState('SigmaForce CEP Official');
     const [upiId, setUpiId] = useState('sigmaforce@upi');
-    const [razorpayKeyId, setRazorpayKeyId] = useState('rzp_test_sigmaforce2026');
+    const [razorpayKeyId, setRazorpayKeyId] = useState('rzp_test_E66NI3Yg44x1mj');
     const [qrImageUrl, setQrImageUrl] = useState('');
     const [settingsSavedMessage, setSettingsSavedMessage] = useState('');
 
     const loadPackages = async () => {
         setLoading(true);
-        const local = localStorage.getItem('sigma_course_packages');
-        const list = local ? JSON.parse(local) : [
-            { id: 'pkg_1', name: 'Police Batch – 100 Tests', exam: 'Police Bharti', totalTests: 100, price: 299, discountPrice: 199, validity: '12 Months', status: 'active' },
-            { id: 'pkg_2', name: 'SSC GD – 100 Tests', exam: 'SSC GD', totalTests: 100, price: 299, discountPrice: 199, validity: '12 Months', status: 'active' },
-            { id: 'pkg_3', name: 'Vanrakshak – 100 Tests', exam: 'Vanrakshak', totalTests: 100, price: 299, discountPrice: 199, validity: '12 Months', status: 'active' }
-        ];
-        setPackages(list);
+        try {
+            const list = await firestoreEngine.getPackages();
+            setPackages(list);
+        } catch (e) {
+            console.error('Error loading packages:', e);
+            setPackages([]);
+        }
 
         const reqs = await firestoreEngine.getPackagePurchaseRequests();
         const pending = reqs.filter(r => r.status === 'pending').length;
@@ -45,7 +45,7 @@ export const PackageManager = ({ onRefresh }) => {
         if (settings) {
             setMerchantName(settings.merchantName || 'SigmaForce CEP Official');
             setUpiId(settings.upiId || 'sigmaforce@upi');
-            setRazorpayKeyId(settings.razorpayKeyId || 'rzp_test_sigmaforce2026');
+            setRazorpayKeyId(settings.razorpayKeyId || 'rzp_test_E66NI3Yg44x1mj');
             setQrImageUrl(settings.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=${encodeURIComponent(settings.upiId || 'sigmaforce@upi')}%26pn=${encodeURIComponent(settings.merchantName || 'SigmaForce')}%26cu=INR`);
         }
 
@@ -84,7 +84,7 @@ export const PackageManager = ({ onRefresh }) => {
             setValidity(p.validity);
             setStatus(p.status);
         } else {
-            setPackageName('Police Batch – 100 Tests');
+            setPackageName('');
             setTargetExam('Police Bharti');
             setTotalTests(100);
             setPrice(299);
@@ -95,7 +95,7 @@ export const PackageManager = ({ onRefresh }) => {
         setModalOpen(true);
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
         const pkgId = editingPkg ? editingPkg.id : 'pkg_' + Date.now();
         const pkgData = {
@@ -110,31 +110,24 @@ export const PackageManager = ({ onRefresh }) => {
             createdAt: editingPkg ? editingPkg.createdAt : new Date().toISOString()
         };
 
-        const existingIdx = packages.findIndex(p => p.id === pkgId);
-        let updated;
-        if (existingIdx >= 0) {
-            updated = packages.map(p => p.id === pkgId ? pkgData : p);
-        } else {
-            updated = [...packages, pkgData];
-        }
-
-        localStorage.setItem('sigma_course_packages', JSON.stringify(updated));
-        setPackages(updated);
+        await firestoreEngine.savePackage(pkgData);
+        await loadPackages();
         setModalOpen(false);
         if (onRefresh) onRefresh();
     };
 
-    const handleToggleStatus = (pkgId) => {
-        const updated = packages.map(p => p.id === pkgId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p);
-        localStorage.setItem('sigma_course_packages', JSON.stringify(updated));
-        setPackages(updated);
+    const handleToggleStatus = async (pkgId) => {
+        const target = packages.find(p => p.id === pkgId);
+        if (!target) return;
+        const updated = { ...target, status: target.status === 'active' ? 'inactive' : 'active' };
+        await firestoreEngine.savePackage(updated);
+        await loadPackages();
     };
 
-    const handleDelete = (pkgId) => {
+    const handleDelete = async (pkgId) => {
         if (!window.confirm('Are you sure you want to delete this course package?')) return;
-        const updated = packages.filter(p => p.id !== pkgId);
-        localStorage.setItem('sigma_course_packages', JSON.stringify(updated));
-        setPackages(updated);
+        await firestoreEngine.deletePackage(pkgId);
+        await loadPackages();
     };
 
     return (
@@ -200,7 +193,7 @@ export const PackageManager = ({ onRefresh }) => {
 
                             <div className="form-group">
                                 <label className="form-label">Razorpay API Key ID (Live / Test Key) *</label>
-                                <input type="text" className="form-control" required value={razorpayKeyId} onChange={e => setRazorpayKeyId(e.target.value)} placeholder="e.g. rzp_live_xxxxxxxxxx or rzp_test_sigmaforce2026" />
+                                <input type="text" className="form-control" required value={razorpayKeyId} onChange={e => setRazorpayKeyId(e.target.value)} placeholder="e.g. rzp_live_xxxxxxxxxx or rzp_test_E66NI3Yg44x1mj" />
                                 <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>
                                     Your official Razorpay Dashboard Key ID for launching instant online payment checkouts.
                                 </small>
