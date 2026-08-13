@@ -99,7 +99,7 @@ export const StudentTable = ({ onRefresh }) => {
                             <th>Enrollment ID</th>
                             <th>Purchased Course Packages</th>
                             <th>Allowed Quota</th>
-                            <th>Remaining Tokens</th>
+                            <th>Remaining Tests</th>
                             <th>Status</th>
                             <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>Actions</th>
                         </tr>
@@ -135,7 +135,7 @@ export const StudentTable = ({ onRefresh }) => {
                                     <td><strong>{s.allowedTests || 0} Tests</strong></td>
                                     <td>
                                         <span className={`badge ${s.remainingTests > 0 ? 'badge-success' : 'badge-danger'}`}>
-                                            {s.remainingTests || 0} Tokens Left
+                                            {s.remainingTests || 0} Tests Left
                                         </span>
                                     </td>
                                     <td>

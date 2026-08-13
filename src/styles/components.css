@@ -842,3 +842,56 @@ textarea.form-control { resize: vertical; min-height: 100px; }
 .cal-p-btn.answered { background: var(--success-bg); color: var(--success); border-color: var(--success-border); }
 .cal-p-btn.marked { background: var(--purple-bg); color: var(--purple); border-color: var(--purple-border); }
 .cal-p-btn.answered_marked { background: var(--indigo-bg); color: var(--indigo); border-color: var(--indigo-border); }
+
+/* ==========================================================================
+   Exam Paper Print / PDF Export (Admin -> Exam Paper Generator tab)
+   Standard print-isolation technique: hide everything on the page except
+   the .exam-paper-print-area subtree when printing / saving as PDF.
+   ========================================================================== */
+.exam-paper-question {
+    padding-bottom: 0.9rem;
+    margin-bottom: 0.9rem;
+    border-bottom: 1px dashed var(--border-color);
+}
+.exam-paper-question:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .exam-paper-print-area,
+    .exam-paper-print-area * {
+        visibility: visible;
+    }
+    .exam-paper-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        background: #fff !important;
+        /* Real padding, not 0 — @page margin is only a *default* in the print
+           dialog; if the admin picks "Margins: None" there, the browser
+           overrides it entirely and content would butt straight up against
+           the paper edge without this. This is the actual safety margin. */
+        padding: 14mm 12mm !important;
+        box-sizing: border-box !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .exam-paper-question {
+        page-break-inside: avoid;
+    }
+    @page {
+        margin: 6mm;
+    }
+}

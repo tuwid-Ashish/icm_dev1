@@ -44,8 +44,8 @@ export const translations = {
         create_free_account: "Create Free Student Account",
 
         // Student Dashboard
-        remaining_tokens: "Remaining Test Tokens",
-        tokens_unit: "Tokens",
+        remaining_tokens: "Remaining Tests",
+        tokens_unit: "Tests",
         active_subscription: "Active subscription plan",
         no_tests_left: "No tests left. Buy package to unlock!",
         completed_mock_tests: "Completed Mock Tests",
@@ -206,6 +206,7 @@ export const translations = {
         tab_questions: "Question Bank & Solutions",
         tab_exams: "Exam Blueprints & Patterns",
         tab_reports: "Submission Reports",
+        tab_exam_paper: "Exam Paper PDF",
         audit_log_title: "System-Wide Test Submission Audit Log",
         audit_log_desc: "Complete audit record of all evaluated practice tests submitted by students, sorted by highest score achiever.",
         search_student_placeholder: "Search student name or email...",
@@ -276,8 +277,8 @@ export const translations = {
         create_free_account: "विनामूल्य विद्यार्थी खाते तयार करा",
 
         // Student Dashboard
-        remaining_tokens: "उरलेले टेस्ट टोकन्स",
-        tokens_unit: "टोकन्स",
+        remaining_tokens: "उरलेल्या टेस्ट",
+        tokens_unit: "टेस्ट",
         active_subscription: "सक्रिय सदस्यता योजना",
         no_tests_left: "टेस्ट शिल्लक नाहीत. अनलॉक करण्यासाठी पॅकेज खरेदी करा!",
         completed_mock_tests: "पूर्ण केलेल्या मॉक टेस्ट्स",
@@ -438,6 +439,7 @@ export const translations = {
         tab_questions: "प्रश्नपेढी आणि स्पष्टीकरणे",
         tab_exams: "परीक्षा ब्लूप्रिंट्स आणि पॅटर्न",
         tab_reports: "सबमिशन अहवाल",
+        tab_exam_paper: "परीक्षा पेपर PDF",
         audit_log_title: "सर्व विद्यार्थी चाचणी सबमिशन ऑडिट लॉग",
         audit_log_desc: "सर्व सबमिट केलेल्या सराव चाचण्यांची नोंद, सर्वाधिक गुण प्राप्त करणाऱ्या गुणवंत विद्यार्थ्यांनुसार क्रमवारी.",
         search_student_placeholder: "विद्यार्थ्याचे नाव किंवा ईमेल शोधा...",

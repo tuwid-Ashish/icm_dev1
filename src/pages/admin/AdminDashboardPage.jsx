@@ -4,12 +4,13 @@ import { QuestionBankManager } from '../../components/admin/QuestionBankManager.
 import { ExamConfigList } from '../../components/admin/ExamConfigList.jsx';
 import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
+import { ExamPaperGenerator } from '../../components/admin/ExamPaperGenerator.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export const AdminDashboardPage = () => {
     const { t } = useLanguage();
-    // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'exams' | 'reports'
+    // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'exams' | 'reports' | 'exam_paper'
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState({
         totalStudents: 2,
@@ -83,11 +84,17 @@ export const AdminDashboardPage = () => {
                 >
                     {t('tab_exams')}
                 </button>
-                <button 
+                <button
                     className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('reports')}
                 >
                     {t('tab_reports')}
+                </button>
+                <button
+                    className={`btn ${activeTab === 'exam_paper' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('exam_paper')}
+                >
+                    {t('tab_exam_paper')}
                 </button>
             </div>
 
@@ -158,6 +165,7 @@ export const AdminDashboardPage = () => {
             {activeTab === 'questions' && <QuestionBankManager onRefresh={loadStats} />}
             {activeTab === 'exams' && <ExamConfigList />}
             {activeTab === 'reports' && <SystemReportsPage />}
+            {activeTab === 'exam_paper' && <ExamPaperGenerator />}
         </div>
     );
 };
