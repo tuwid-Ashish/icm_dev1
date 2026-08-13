@@ -3,8 +3,11 @@
    Strict Rule: Zero Emojis / Zero Icons Anywhere in UI
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap');
-@import './components.css';
+/* Google Fonts are loaded via a <link> tag in pages/_document.js instead of
+   @import (Next.js's built-in CSS pipeline doesn't handle external @import
+   url() reliably inside global stylesheets). components.css is imported
+   separately in pages/_app.js rather than chained here via @import, so it's
+   only processed once. */
 
 :root {
     /* Base Body & Surfaces */

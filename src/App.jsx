@@ -18,8 +18,8 @@ import { HistoryPage } from './pages/student/HistoryPage.jsx';
 import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx';
 
-import './styles/theme.css';
-import './styles/components.css';
+// Global CSS (theme.css, components.css) is imported once in pages/_app.js —
+// Next.js only allows global stylesheet imports from the custom App.
 
 const MainAppContent = () => {
     const { user, logout } = useAuth();

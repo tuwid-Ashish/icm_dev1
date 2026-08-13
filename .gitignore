@@ -2,6 +2,8 @@
 node_modules/
 .pnpm-store/
 
+.next/
+
 # Production build outputs
 dist/
 dist-ssr/
@@ -14,6 +16,7 @@ dist-ssr/
 .env.test.local
 .env.production.local
 serviceAccountKey.json
+rzp-key-really.csv
 
 # Workspace & internal dev folders
 .icm/

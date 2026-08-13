@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "lint": "eslint .",
-    "preview": "vite preview",
     "seed:db": "node scripts/seedFirestoreNode.js",
     "seed:admin": "node scripts/seedFirestoreAdmin.js",
     "create:admin": "node scripts/createAdminAccount.js"
@@ -18,13 +18,12 @@
     "katex": "^0.18.4",
     "lucide-react": "^0.439.0",
     "mathlive": "^0.110.0",
+    "next": "^14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.4.1"
+    "@types/react-dom": "^18.3.0"
   }
 }
