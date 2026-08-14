@@ -135,8 +135,32 @@ body {
 .brand-group {
     display: flex;
     align-items: center;
+    gap: 0.6rem;
     cursor: pointer;
     flex-shrink: 0;
+}
+
+/* White badge behind the logo mark — the source artwork has a light
+   background baked in (not transparent), which would look like a stray
+   white square directly on the orange navbar without this. */
+.brand-logo-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    padding: 3px;
+}
+
+.brand-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .brand-logo-text {
@@ -362,6 +386,11 @@ body {
     .brand-logo-text {
         font-size: 1.15rem !important;
         white-space: nowrap;
+    }
+
+    .brand-logo-badge {
+        width: 32px;
+        height: 32px;
     }
 }
 

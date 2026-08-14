@@ -120,6 +120,13 @@ export const ExamConfigList = ({ onRefresh }) => {
         if (onRefresh) onRefresh();
     };
 
+    const handleDelete = async (examId) => {
+        if (!window.confirm('Are you sure you want to delete this exam blueprint? This cannot be undone, and any package still pointing at this exam will no longer unlock anything.')) return;
+        await firestoreEngine.deleteExamBlueprint(examId);
+        await loadExams();
+        if (onRefresh) onRefresh();
+    };
+
     return (
         <div className="card">
             <div className="card-header">
@@ -175,6 +182,9 @@ export const ExamConfigList = ({ onRefresh }) => {
                                         <div className="action-buttons-group">
                                             <button className="btn btn-secondary btn-sm" onClick={() => handleOpenModal(e)}>
                                                 Configure Blueprint
+                                            </button>
+                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e.id)}>
+                                                Delete
                                             </button>
                                         </div>
                                     </td>

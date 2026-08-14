@@ -24,6 +24,9 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
             {/* Main Top Header Bar */}
             <div className="top-navbar-main">
                 <div className="brand-group" onClick={() => handleNavClick('home')}>
+                    <span className="brand-logo-badge">
+                        <img src="/logo-icon.png" alt="" className="brand-logo-img" />
+                    </span>
                     <div className="brand-logo-text">{t('brand_name')}</div>
                 </div>
 

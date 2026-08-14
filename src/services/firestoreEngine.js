@@ -116,6 +116,20 @@ export const firestoreEngine = {
         throw new Error('Firestore database is not connected.');
     },
 
+    deleteExamBlueprint: async (examId) => {
+        if (isFirebaseConnected && db) {
+            try {
+                await deleteDoc(doc(db, 'exams', examId));
+                console.log('[Firestore Engine] Deleted exam blueprint from Firestore:', examId);
+                return { success: true };
+            } catch (err) {
+                console.error('[Firestore Engine] Error deleting exam blueprint from Firestore:', err.message);
+                throw err;
+            }
+        }
+        throw new Error('Firestore database is not connected.');
+    },
+
     // 5. Get Student Profile & Test Quotas (Firestore 'users' collection)
     getUserProfile: async (uid) => {
         if (!uid) return null;
