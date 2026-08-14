@@ -1,7 +1,7 @@
 export const translations = {
     en: {
         // Navbar & Brand
-        brand_name: "SigmaForce CEP",
+        brand_name: "Sigmavardi",
         student_dashboard: "Student Dashboard",
         exam_catalog: "Exam Catalog",
         test_history: "Test History",
@@ -18,7 +18,7 @@ export const translations = {
         landing_desc: "Authentic exam-like practice for Police Bharti, Vanrakshak (Forest Guard), and SSC GD — real-time timers, evaluation with negative marking, and question papers in both Marathi and English.",
         get_started_free: "Get Started Free",
         sign_in_portal: "Sign In to Portal",
-        why_aspirants_train: "Why Aspirants Train on SigmaForce CEP",
+        why_aspirants_train: "Why Aspirants Train on Sigmavardi",
         why_desc: "Features designed to maximize speed, accuracy, and examination confidence.",
         pillar_1_tag: "Feature 01",
         pillar_1_title: "Authentic Exam Pattern",
@@ -234,7 +234,7 @@ export const translations = {
 
     mr: {
         // Navbar & Brand
-        brand_name: "सिग्माफोर्स CEP",
+        brand_name: "सिग्मावर्दी",
         student_dashboard: "विद्यार्थी डॅशबोर्ड",
         exam_catalog: "परीक्षा कॅटलॉग",
         test_history: "चाचणी इतिहास",
@@ -251,7 +251,7 @@ export const translations = {
         landing_desc: "पोलिस भरती, वनरक्षक आणि SSC GD साठी अस्सल परीक्षेसारखा सराव — रिअल-टाइम टायमर, निगेटिव्ह मार्किंगसह मूल्यमापन, आणि मराठी व इंग्रजी दोन्ही भाषेत प्रश्नपत्रिका.",
         get_started_free: "विनामूल्य नोंदणी करा",
         sign_in_portal: "पोर्टलवर साइन इन करा",
-        why_aspirants_train: "परीक्षार्थी सिग्माफोर्स CEP वर सराव का करतात?",
+        why_aspirants_train: "परीक्षार्थी सिग्मावर्दी वर सराव का करतात?",
         why_desc: "वेग, अचूकता आणि परीक्षा आत्मविश्वास वाढवण्यासाठी डिझाइन केलेली वैशिष्ट्ये.",
         pillar_1_tag: "वैशिष्ट्य ०१",
         pillar_1_title: "अस्सल परीक्षा पॅटर्न",
