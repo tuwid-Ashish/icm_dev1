@@ -13,6 +13,20 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
 
     if (!isOpen) return null;
 
+    // Resets all local state before handing control back to the parent —
+    // otherwise Cancel (or the modal's own ✕) leaves the preview/error/file
+    // state sitting around, and reopening the modal shows stale results
+    // from the previous parse instead of a fresh form.
+    const handleClose = () => {
+        setRawText('');
+        setSelectedFile(null);
+        setIsParsing(false);
+        setParsedPreview(null);
+        setValidationError('');
+        setSuccessMessage('');
+        onClose();
+    };
+
     const handleFileSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -70,13 +84,13 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={handleClose}
             title="Bulk Import Questions from Google Sheets CSV"
             subtitle="Paste raw CSV rows or pick a .csv file from your computer."
             maxWidth="780px"
             footer={
                 <>
-                    <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
                     {!parsedPreview ? (
                         <button type="button" className="btn btn-primary" onClick={handleParsePreview} disabled={isParsing}>
                             {isParsing ? 'Validating CSV...' : 'Parse & Validate CSV'}
@@ -123,10 +137,10 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
 
                     <div className="form-group">
                         <label className="form-label">Option B: Or Paste CSV Rows Directly</label>
-                        <textarea 
+                        <textarea
                             className="form-control"
                             style={{ minHeight: '140px', fontFamily: 'monospace', fontSize: '0.8rem' }}
-                            placeholder={`batch,subject,text,optionA,optionB,optionC,optionD,correctIndex,marks,explanation\n"Police Bharti","Mathematics","15 + 25 = ?","35","40","45","50",1,1,"15 + 25 equals 40."`}
+                            placeholder={`batch,subject,text,optionA,optionB,optionC,optionD,correctIndex,marks,explanation\n"Police Bharti","Mathematics","15 + 25 = ?","35","40","45","50",1,1,"15 + 25 equals 40."\n"Police Bharti;SSC GD","Mathematics","20 - 5 = ?","10","15","20","25",1,1,"20 - 5 equals 15."`}
                             value={rawText}
                             onChange={e => setRawText(e.target.value)}
                         />
@@ -134,6 +148,8 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
 
                     <div style={{ background: 'var(--bg-subtle)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         <strong>Expected Header Columns:</strong> <code>id, batch, subject, questionText, optionA, optionB, optionC, optionD, correctOption, marks</code>
+                        <br />
+                        <strong>Multiple batches for one question?</strong> Separate them with a semicolon inside the batch cell — e.g. <code>Police Bharti;SSC GD</code> (not a comma, since commas already separate CSV columns).
                     </div>
                 </div>
             ) : (
@@ -159,7 +175,11 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                                 {parsedPreview.map((q, idx) => (
                                     <tr key={idx}>
                                         <td>{idx + 1}</td>
-                                        <td><span className="badge badge-purple">{q.batch}</span></td>
+                                        <td style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                                            {(q.batches || [q.batch]).map(b => (
+                                                <span key={b} className="badge badge-purple">{b}</span>
+                                            ))}
+                                        </td>
                                         <td><strong>{q.subject}</strong></td>
                                         <td style={{ maxWidth: '220px' }}>{q.text}</td>
                                         <td><small>{q.options.join(' | ')}</small></td>
