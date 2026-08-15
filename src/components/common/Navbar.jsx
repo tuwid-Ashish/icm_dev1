@@ -30,6 +30,32 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                     <div className="brand-logo-text">{t('brand_name')}</div>
                 </div>
 
+                {/* Language switcher stays outside .nav-user-actions so it remains
+                    visible on mobile — .nav-user-actions itself hides below 768px
+                    (its content is duplicated in the mobile menu drawer). */}
+                <button
+                    type="button"
+                    className="btn btn-sm nav-lang-toggle-mobile"
+                    style={{
+                        background: '#0f172a',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        padding: '0.35rem 0.6rem',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        display: 'none',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        borderRadius: 'var(--radius-sm)',
+                        marginLeft: 'auto'
+                    }}
+                    onClick={toggleLanguage}
+                    title="Switch Language / भाषा बदला"
+                >
+                    <span>🌐</span>
+                </button>
+
                 <button
                     type="button"
                     className="nav-mobile-toggle"
@@ -79,8 +105,10 @@ export const Navbar = ({ activeRoute, onNavigate }) => {
                     </nav>
                 )}
 
-                {/* Right User Display & Actions */}
-                <div className="nav-user-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {/* Right User Display & Actions — hidden below 768px via CSS
+                    (.nav-user-actions), replaced by the mobile menu drawer;
+                    no inline display here so that CSS rule can actually apply. */}
+                <div className="nav-user-actions" style={{ alignItems: 'center', gap: '0.75rem' }}>
                     {/* Language Switcher Badge */}
                     <button 
                         type="button"

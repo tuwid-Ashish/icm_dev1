@@ -198,6 +198,72 @@ body {
     margin-top: 0.5rem;
 }
 
+/* Post-login Navigation Action Cards — color-coded left border + icon badge
+   + bilingual title/description + trailing arrow, reused across every
+   post-login page for a consistent look (client reference design). */
+.nav-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+}
+
+.nav-action-card {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nav-action-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.nav-action-icon {
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.nav-action-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.nav-action-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.nav-action-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.nav-action-arrow {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
 /* Selection Cards Grid */
 .cards-equal-grid {
     display: grid;
@@ -548,7 +614,7 @@ textarea.form-control { resize: vertical; min-height: 100px; }
 
 .subject-row-grid {
     display: grid;
-    grid-template-columns: 1fr 120px 40px;
+    grid-template-columns: 1fr 100px 100px 40px;
     gap: 0.75rem;
     align-items: center;
     margin-bottom: 0.6rem;
@@ -556,7 +622,7 @@ textarea.form-control { resize: vertical; min-height: 100px; }
 
 @media (max-width: 640px) {
     .subject-row-grid {
-        grid-template-columns: 1fr 90px 40px !important;
+        grid-template-columns: 1fr 80px 80px 40px !important;
         gap: 0.4rem !important;
     }
 
@@ -758,7 +824,14 @@ textarea.form-control { resize: vertical; min-height: 100px; }
     }
 
     .cbt-main-grid {
-        grid-template-columns: 1fr !important;
+        /* minmax(0, 1fr), not 1fr — a bare 1fr track's minimum size defaults to
+           the content's min-content width, which lets long question text push
+           this column (and the page) wider than the viewport on narrow phones. */
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .cbt-q-container, .cbt-palette-panel {
+        min-width: 0;
     }
 
     .cbt-palette-panel {
