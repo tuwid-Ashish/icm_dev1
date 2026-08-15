@@ -144,10 +144,10 @@ export const ExamCatalogPage = () => {
                                                 {e.subjects.map((s, idx) => {
                                                     const sylTopic = syllabus[idx]?.topics || 'Comprehensive section questions matching official blueprint';
                                                     return (
-                                                        <tr key={s.id}>
+                                                        <tr key={s.id || s.name || idx}>
                                                             <td><strong>{s.name}</strong></td>
                                                             <td>{s.questionsCount} {t('questions_label')}</td>
-                                                            <td><strong>{s.questionsCount * s.marksPerQuestion} {t('marks_unit')}</strong></td>
+                                                            <td><strong>{(s.questionsCount || 0) * (s.marksPerQuestion || 1)} {t('marks_unit')}</strong></td>
                                                             <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{sylTopic}</td>
                                                         </tr>
                                                     );

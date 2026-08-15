@@ -117,7 +117,7 @@ export const LandingPage = ({ onNavigate }) => {
 
                                 <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.25rem' }}>
                                     <div>{t('duration_label')}: <strong>{e.durationMinutes} {t('mins_unit')}</strong></div>
-                                    <div>{t('total_marks_label')}: <strong>{e.totalQuestions}</strong></div>
+                                    <div>{t('total_questions_label')}: <strong>{e.totalQuestions}</strong></div>
                                     <div>{t('total_marks_label')}: <strong>{e.totalMarks}</strong></div>
                                     <div>{t('negative_rate_label')}: <strong>{e.negativeMarkingRate}</strong></div>
                                 </div>
@@ -129,7 +129,7 @@ export const LandingPage = ({ onNavigate }) => {
                                     {e.subjects.map(s => (
                                         <li key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px solid var(--border-color)' }}>
                                             <span style={{ color: 'var(--text-secondary)' }}>• {s.name}</span>
-                                            <strong style={{ color: 'var(--text-primary)' }}>{s.questionsCount} {t('qs_unit')} ({s.questionsCount * s.marksPerQuestion} {t('marks_unit')})</strong>
+                                            <strong style={{ color: 'var(--text-primary)' }}>{s.questionsCount} {t('qs_unit')} ({(s.questionsCount || 0) * (s.marksPerQuestion || 1)} {t('marks_unit')})</strong>
                                         </li>
                                     ))}
                                 </ul>

@@ -19,10 +19,10 @@ export const ExamConfigList = ({ onRefresh }) => {
 
     // Subject breakdown state
     const [subjectBreakdown, setSubjectBreakdown] = useState([
-        { name: 'Mathematics', questionsCount: 25 },
-        { name: 'Reasoning Ability', questionsCount: 25 },
-        { name: 'General Knowledge & Current Affairs', questionsCount: 25 },
-        { name: 'Marathi Grammar / Verbal', questionsCount: 25 }
+        { name: 'Mathematics', questionsCount: 25, marksPerQuestion: 1 },
+        { name: 'Reasoning Ability', questionsCount: 25, marksPerQuestion: 1 },
+        { name: 'General Knowledge & Current Affairs', questionsCount: 25, marksPerQuestion: 1 },
+        { name: 'Marathi Grammar / Verbal', questionsCount: 25, marksPerQuestion: 1 }
     ]);
 
     const loadExams = async () => {
@@ -48,13 +48,15 @@ export const ExamConfigList = ({ onRefresh }) => {
             setIsFreeTest(exam.isFreeTest || false);
 
             if (exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0) {
-                setSubjectBreakdown(exam.subjects);
+                // Older blueprints saved before marksPerQuestion existed — default to 1
+                // so the field is never undefined (that's what produced NaN Marks).
+                setSubjectBreakdown(exam.subjects.map(s => ({ ...s, marksPerQuestion: s.marksPerQuestion || 1 })));
             } else {
                 setSubjectBreakdown([
-                    { name: 'Mathematics', questionsCount: 25 },
-                    { name: 'Reasoning Ability', questionsCount: 25 },
-                    { name: 'General Knowledge', questionsCount: 25 },
-                    { name: 'Marathi Language', questionsCount: 25 }
+                    { name: 'Mathematics', questionsCount: 25, marksPerQuestion: 1 },
+                    { name: 'Reasoning Ability', questionsCount: 25, marksPerQuestion: 1 },
+                    { name: 'General Knowledge', questionsCount: 25, marksPerQuestion: 1 },
+                    { name: 'Marathi Language', questionsCount: 25, marksPerQuestion: 1 }
                 ]);
             }
         } else {
@@ -66,10 +68,10 @@ export const ExamConfigList = ({ onRefresh }) => {
             setMinQualifyingPercent(40);
             setIsFreeTest(false);
             setSubjectBreakdown([
-                { name: 'Mathematics', questionsCount: 25 },
-                { name: 'Reasoning Ability', questionsCount: 25 },
-                { name: 'General Knowledge', questionsCount: 25 },
-                { name: 'Marathi Language', questionsCount: 25 }
+                { name: 'Mathematics', questionsCount: 25, marksPerQuestion: 1 },
+                { name: 'Reasoning Ability', questionsCount: 25, marksPerQuestion: 1 },
+                { name: 'General Knowledge', questionsCount: 25, marksPerQuestion: 1 },
+                { name: 'Marathi Language', questionsCount: 25, marksPerQuestion: 1 }
             ]);
         }
         setModalOpen(true);
@@ -77,12 +79,12 @@ export const ExamConfigList = ({ onRefresh }) => {
 
     const handleSubjectChange = (index, field, value) => {
         const updated = [...subjectBreakdown];
-        updated[index][field] = field === 'questionsCount' ? parseInt(value, 10) || 0 : value;
+        updated[index][field] = (field === 'questionsCount' || field === 'marksPerQuestion') ? parseFloat(value) || 0 : value;
         setSubjectBreakdown(updated);
     };
 
     const handleAddSubject = () => {
-        setSubjectBreakdown([...subjectBreakdown, { name: 'New Subject', questionsCount: 10 }]);
+        setSubjectBreakdown([...subjectBreakdown, { name: 'New Subject', questionsCount: 10, marksPerQuestion: 1 }]);
     };
 
     const handleRemoveSubject = (index) => {
@@ -92,7 +94,7 @@ export const ExamConfigList = ({ onRefresh }) => {
     };
 
     const calculatedTotalQuestions = subjectBreakdown.reduce((sum, s) => sum + (s.questionsCount || 0), 0);
-    const calculatedTotalMarks = calculatedTotalQuestions;
+    const calculatedTotalMarks = subjectBreakdown.reduce((sum, s) => sum + (s.questionsCount || 0) * (s.marksPerQuestion || 1), 0);
 
     const handleSave = async (e) => {
         e.preventDefault();
@@ -266,27 +268,46 @@ export const ExamConfigList = ({ onRefresh }) => {
                         </button>
                     </div>
 
+                    <div className="subject-row-grid" style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                        <span>Subject Name</span>
+                        <span>Qs Count</span>
+                        <span>Marks/Q</span>
+                        <span></span>
+                    </div>
+
                     {subjectBreakdown.map((sb, idx) => (
                         <div key={idx} className="subject-row-grid">
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 className="form-control" 
                                 required 
                                 value={sb.name} 
                                 onChange={e => handleSubjectChange(idx, 'name', e.target.value)}
                                 placeholder="Subject Name (e.g. Mathematics)"
                             />
-                            <input 
-                                type="number" 
-                                className="form-control" 
-                                required 
-                                min="1" 
-                                max="200" 
-                                value={sb.questionsCount} 
+                            <input
+                                type="number"
+                                className="form-control"
+                                required
+                                min="1"
+                                max="200"
+                                value={sb.questionsCount}
                                 onChange={e => handleSubjectChange(idx, 'questionsCount', e.target.value)}
                                 placeholder="Qs Count"
                             />
-                            <button 
+                            <input
+                                type="number"
+                                className="form-control"
+                                required
+                                min="0.25"
+                                max="20"
+                                step="0.25"
+                                value={sb.marksPerQuestion || 1}
+                                onChange={e => handleSubjectChange(idx, 'marksPerQuestion', e.target.value)}
+                                placeholder="Marks/Q"
+                                title="Marks per Question"
+                            />
+                            <button
                                 type="button" 
                                 className="btn btn-danger btn-sm" 
                                 onClick={() => handleRemoveSubject(idx)}
