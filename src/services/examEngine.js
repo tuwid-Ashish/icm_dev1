@@ -122,6 +122,7 @@ class ExamEngine {
             studentName: studentInfo?.studentName || currentUser?.name || 'Student User',
             studentEmail: studentInfo?.studentEmail || currentUser?.email || 'student@sigma.com',
             examId: exam.id,
+            isFreeTest: !!exam.isFreeTest,
             examName: subjectFilter !== 'ALL' ? `${exam.name} (${subjectFilter} Practice)` : exam.name,
             examCode: exam.code,
             durationMinutes: subjectFilter !== 'ALL' ? Math.ceil(selectedCount * 1.2) : exam.durationMinutes,

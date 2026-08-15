@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ExamProvider, useExam } from './context/ExamContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { LanguageProvider } from './context/LanguageContext.jsx';
+import { storageService } from './services/storageService.js';
 
 import { Navbar } from './components/common/Navbar.jsx';
 import { LandingPage } from './pages/LandingPage.jsx';
@@ -26,7 +27,17 @@ const MainAppContent = () => {
     const { activeSession, activeResult, setActiveResult } = useExam();
 
     // Navigation state: 'home' | 'login' | 'signup' | 'dashboard' | 'exams' | 'history' | 'admin_login' | 'admin_dashboard'
-    const [currentRoute, setCurrentRoute] = useState('home');
+    // Initialized from the locally cached auth profile (not just Firebase's async
+    // onAuthStateChanged) so a page reload between tests lands an already-logged-in
+    // student back on their dashboard instead of the logged-out landing page —
+    // the landing page made it look like the session had been lost even though the
+    // Firebase auth token itself was still valid.
+    const [currentRoute, setCurrentRoute] = useState(() => {
+        const cached = storageService.getCurrentUser();
+        if (cached?.role === 'admin') return 'admin_dashboard';
+        if (cached?.role === 'student') return 'dashboard';
+        return 'home';
+    });
 
     // Handle URL path inspection for isolated /admin route
     useEffect(() => {

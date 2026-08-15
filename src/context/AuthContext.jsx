@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { firebaseAuthService } from '../services/firebaseAuthService.js';
 import { storageService } from '../services/storageService.js';
+import { firestoreEngine } from '../services/firestoreEngine.js';
 
 const AuthContext = createContext(null);
 

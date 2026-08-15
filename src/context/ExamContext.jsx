@@ -84,9 +84,8 @@ export const ExamProvider = ({ children }) => {
             return session;
         }
 
-        // Decrement quota in Firestore
-        await firestoreEngine.decrementStudentQuota(studentId);
-        refreshUser();
+        // Quota is deducted on successful submission (see submitCurrentTest), not
+        // here at start — an abandoned/incomplete test must not cost a test slot.
 
         const durationSecs = session.durationMinutes * 60;
         updateActiveSession(session);
@@ -223,6 +222,12 @@ export const ExamProvider = ({ children }) => {
 
         // Save scorecard submission to Cloud Firestore & LocalStorage
         await firestoreEngine.saveSubmission(evaluated);
+
+        // Only a successfully submitted, non-free test consumes a quota slot.
+        if (!sessionToSubmit.isFreeTest) {
+            await firestoreEngine.decrementStudentQuota(sessionToSubmit.studentId);
+            refreshUser();
+        }
 
         // Clear active session
         updateActiveSession(null);
