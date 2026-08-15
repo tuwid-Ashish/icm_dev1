@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useExam } from '../../context/ExamContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
@@ -6,11 +6,15 @@ import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { PackagePurchaseModal } from '../../components/student/PackagePurchaseModal.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
 import { getExamAccess } from '../../utils/examAccess.js';
+import { NavActionCard } from '../../components/common/NavActionCard.jsx';
 
 export const StudentDashboardPage = ({ onNavigate }) => {
     const { user } = useAuth();
     const { startPracticeTest } = useExam();
     const { t } = useLanguage();
+    const packagesRef = useRef(null);
+    const examBoardsRef = useRef(null);
+    const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const [exams, setExams] = useState([]);
     const [packages, setPackages] = useState([]);
     const [submissions, setSubmissions] = useState([]);
@@ -94,7 +98,7 @@ export const StudentDashboardPage = ({ onNavigate }) => {
             {/* Top Quota Metrics Banner */}
             <div className="stats-grid">
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--primary)' }}>
-                    <div className="stat-title">{t('remaining_tokens')}</div>
+                    <div className="stat-title">📊 {t('remaining_tokens')}</div>
                     <div className="stat-val" style={{ color: 'var(--primary)' }}>{userProfile ? (userProfile.remainingTests || 0) : 0} {t('tokens_unit')}</div>
                     <div className="stat-sub">
                         {userProfile && (userProfile.remainingTests > 0) ? t('active_subscription') : t('no_tests_left')}
@@ -102,20 +106,52 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                 </div>
 
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--success)' }}>
-                    <div className="stat-title">{t('completed_mock_tests')}</div>
+                    <div className="stat-title">✅ {t('completed_mock_tests')}</div>
                     <div className="stat-val" style={{ color: 'var(--success)' }}>{submissions.length} {t('attempted_unit')}</div>
                     <div className="stat-sub">{t('scorecards_evaluated')}</div>
                 </div>
 
                 <div className="stat-card" style={{ borderLeft: '4px solid var(--purple)' }}>
-                    <div className="stat-title">{t('purchased_packages')}</div>
+                    <div className="stat-title">📦 {t('purchased_packages')}</div>
                     <div className="stat-val" style={{ color: 'var(--purple)' }}>{userProfile && userProfile.purchasedPackages ? userProfile.purchasedPackages.length : 0} {t('plans_unit')}</div>
                     <div className="stat-sub">{t('active_subscriptions')}</div>
                 </div>
             </div>
 
+            {/* Quick Action Navigation Cards */}
+            <div className="nav-actions-grid">
+                <NavActionCard
+                    icon="📄"
+                    color="#4338ca"
+                    title={t('nav_active_package')}
+                    description={t('nav_active_package_desc')}
+                    onClick={() => scrollTo(packagesRef)}
+                />
+                <NavActionCard
+                    icon="🕐"
+                    color="#0891b2"
+                    title={t('nav_test_history')}
+                    description={t('nav_test_history_desc')}
+                    onClick={() => onNavigate('history')}
+                />
+                <NavActionCard
+                    icon="🛍️"
+                    color="#ea580c"
+                    title={t('nav_new_package')}
+                    description={t('nav_new_package_desc')}
+                    onClick={() => scrollTo(packagesRef)}
+                />
+                <NavActionCard
+                    icon="📝"
+                    color="#16a34a"
+                    title={t('nav_free_tests')}
+                    description={t('nav_free_tests_desc')}
+                    onClick={() => scrollTo(examBoardsRef)}
+                />
+            </div>
+
             {/* Available Course Packages Store Banner */}
-            <div className="card">
+            <div className="card" ref={packagesRef}>
                 <div className="card-header">
                     <div>
                         <h3 className="card-title">{t('available_packages_title')}</h3>
@@ -166,7 +202,7 @@ export const StudentDashboardPage = ({ onNavigate }) => {
             </div>
 
             {/* Target Exam Selection Cards */}
-            <div className="card">
+            <div className="card" ref={examBoardsRef}>
                 <div className="card-header">
                     <div>
                         <h3 className="card-title">Target Recruitment Examination Boards</h3>
