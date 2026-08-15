@@ -72,7 +72,12 @@ const MainAppContent = () => {
                 onNavigate={handleNavigate}
             />
 
-            <main style={{ flex: 1 }}>
+            {/* min-width: 0 overrides the flex item default of min-width: auto —
+                without it, a wide child (like the 4-column packages grid) makes
+                this flex item grow to fit its content's min-content width
+                instead of constraining it, pushing the whole page into
+                horizontal overflow instead of letting the grid wrap. */}
+            <main style={{ flex: 1, minWidth: 0 }}>
                 {/* Active CBT Test Session (Blocked for Admins) */}
                 {activeSession && user?.role === 'student' ? (
                     <div className="container">

@@ -1,7 +1,7 @@
 export const translations = {
     en: {
         // Navbar & Brand
-        brand_name: "Sigmavardi",
+        brand_name: "SigmaVardi",
         student_dashboard: "Student Dashboard",
         exam_catalog: "Exam Catalog",
         test_history: "Test History",

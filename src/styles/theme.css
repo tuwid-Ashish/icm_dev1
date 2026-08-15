@@ -178,6 +178,23 @@ body {
     gap: 1.75rem;
 }
 
+/* Desktop-only: same left-aligned layout, just a bigger badge/text than
+   the shared mobile size. */
+@media (min-width: 769px) {
+    .top-navbar-main {
+        min-height: 76px;
+    }
+
+    .brand-logo-badge {
+        width: 68px;
+        height: 68px;
+    }
+
+    .brand-logo-text {
+        font-size: 1.55rem;
+    }
+}
+
 .nav-mobile-toggle {
     display: none;
     align-items: center;
