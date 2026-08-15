@@ -6,6 +6,7 @@ import { MathRenderer } from '../common/MathRenderer.jsx';
 import { MathExpressionEditor } from '../common/MathExpressionEditor.jsx';
 import { MathToolbar } from './MathToolbar.jsx';
 import { looksLikeMathContent } from '../../utils/mathContent.js';
+import { SUBJECT_CODES, resolveSubjectCode } from '../../constants/subjectCodes.js';
 
 export const QuestionBankManager = ({ onRefresh }) => {
     const [questions, setQuestions] = useState([]);
@@ -21,7 +22,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
     const [selectedBatches, setSelectedBatches] = useState(['Police Bharti']);
     const [isAllBatches, setIsAllBatches] = useState(false);
 
-    const [qSubject, setQSubject] = useState('Mathematics');
+    const [qSubjectCode, setQSubjectCode] = useState('M1');
     const [qText, setQText] = useState('');
     const [qTextMr, setQTextMr] = useState('');
     const [imageUrl, setImageUrl] = useState('');
@@ -59,6 +60,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
             (item.text && item.text.toLowerCase().includes(query)) || 
             (item.text_mr && item.text_mr.toLowerCase().includes(query)) || 
             (item.subject && item.subject.toLowerCase().includes(query)) ||
+            (item.subjectCode && item.subjectCode.toLowerCase().includes(query)) ||
             (item.id && item.id.toLowerCase().includes(query))
         );
     }
@@ -74,7 +76,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 setIsAllBatches(false);
                 setSelectedBatches(batchesArr);
             }
-            setQSubject(q.subject || 'Mathematics');
+            setQSubjectCode(q.subjectCode || resolveSubjectCode(q.subject).code);
             setQText(q.text || '');
             setQTextMr(q.text_mr || '');
             setImageUrl(q.imageUrl || (q.questionImages && q.questionImages[0]?.url) || '');
@@ -89,7 +91,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
         } else {
             setIsAllBatches(false);
             setSelectedBatches(['Police Bharti']);
-            setQSubject('Mathematics');
+            setQSubjectCode('M1');
             setQText('');
             setQTextMr('');
             setImageUrl('');
@@ -131,11 +133,14 @@ export const QuestionBankManager = ({ onRefresh }) => {
         const batchesToSave = isAllBatches ? ['ALL'] : selectedBatches;
         const batchDisplayString = isAllBatches ? 'All Batches' : selectedBatches.join(', ');
 
+        const subjectEntry = SUBJECT_CODES.find(s => s.code === qSubjectCode);
+
         const questionData = {
             id: editingQ ? editingQ.id : 'Q-' + Date.now(),
             batches: batchesToSave,
             batch: batchDisplayString,
-            subject: qSubject,
+            subjectCode: qSubjectCode,
+            subject: subjectEntry ? subjectEntry.name : qSubjectCode,
             questionType,
             text: qText,
             text_mr: qTextMr || qText,
@@ -224,7 +229,9 @@ export const QuestionBankManager = ({ onRefresh }) => {
                                             {Array.isArray(q.batches) ? (q.batches.includes('ALL') ? 'All Batches' : q.batches.join(', ')) : (q.batch || 'Police Bharti')}
                                         </span>
                                     </td>
-                                    <td><strong>{q.subject}</strong></td>
+                                    <td>
+                                        <span className="badge badge-orange">{q.subjectCode || resolveSubjectCode(q.subject).code}</span> <strong>{q.subject}</strong>
+                                    </td>
                                     <td style={{ maxWidth: '280px' }}>
                                         <MathRenderer text={q.text} imageUrl={q.imageUrl || (q.questionImages && q.questionImages[0]?.url)} />
                                     </td>
@@ -333,7 +340,11 @@ export const QuestionBankManager = ({ onRefresh }) => {
 
                         <div className="form-group">
                             <label className="form-label">Subject</label>
-                            <input type="text" className="form-control" required value={qSubject} onChange={e => setQSubject(e.target.value)} placeholder="e.g. Mathematics, Reasoning, General Knowledge, Marathi" />
+                            <select className="form-control" required value={qSubjectCode} onChange={e => setQSubjectCode(e.target.value)}>
+                                {SUBJECT_CODES.map(s => (
+                                    <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                                ))}
+                            </select>
                         </div>
 
                         {questionType === 'mathematical' && (

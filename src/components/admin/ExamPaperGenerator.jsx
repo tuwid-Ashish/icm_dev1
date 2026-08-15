@@ -3,6 +3,15 @@ import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { MathRenderer } from '../common/MathRenderer.jsx';
 import { EXAM_BATCHES } from '../../constants/examBatches.js';
 import { looksLikeMathContent } from '../../utils/mathContent.js';
+import { resolveSubjectCode } from '../../constants/subjectCodes.js';
+
+// Groups/filters by resolved subject code+name rather than raw q.subject
+// text, so spelling variants ("Maths" vs "Mathematics" vs "गणित") collapse
+// into one bucket instead of splintering the picker into near-duplicates.
+const subjectLabel = (q) => {
+    const r = resolveSubjectCode(q.subjectCode || q.subject);
+    return `${r.code} — ${r.name}`;
+};
 
 /**
  * Lets an admin filter/sort the question bank and print a paper-formatted
@@ -44,7 +53,7 @@ export const ExamPaperGenerator = () => {
 
     const availableSubjects = useMemo(() => {
         const set = new Set();
-        questions.forEach(q => { if (q.subject) set.add(q.subject); });
+        questions.forEach(q => { if (q.subject) set.add(subjectLabel(q)); });
         return Array.from(set).sort();
     }, [questions]);
 
@@ -72,7 +81,7 @@ export const ExamPaperGenerator = () => {
             // that (show nothing) rather than silently matching everything.
             // Initial population to "all subjects" happens once via the
             // effect below, before the admin has touched anything.
-            const subjectMatch = selectedSubjects.includes(q.subject);
+            const subjectMatch = selectedSubjects.includes(subjectLabel(q));
             // questionType is only set on questions authored through the
             // newer math editor — most legacy/bulk-imported questions never
             // got it set even when their text does contain LaTeX. Falling
@@ -112,7 +121,7 @@ export const ExamPaperGenerator = () => {
         candidateQuestions.forEach(q => {
             if (term && !(q.text || '').toLowerCase().includes(term) && !(q.subject || '').toLowerCase().includes(term)) return;
             if (pickerShowMode === 'selected' && !selectedIds.has(q.id)) return;
-            const subject = q.subject || 'General';
+            const subject = subjectLabel(q);
             if (!bySubject.has(subject)) bySubject.set(subject, []);
             bySubject.get(subject).push(q);
         });
@@ -130,7 +139,7 @@ export const ExamPaperGenerator = () => {
         const map = new Map();
         candidateQuestions.forEach(q => {
             if (!selectedIds.has(q.id)) return;
-            const subject = q.subject || 'General';
+            const subject = subjectLabel(q);
             const entry = map.get(subject) || { count: 0, marks: 0 };
             entry.count += 1;
             entry.marks += q.marks || 1;
@@ -165,7 +174,7 @@ export const ExamPaperGenerator = () => {
         list = [...list].sort((a, b) => {
             if (sortBy === 'marks') return (b.marks || 1) - (a.marks || 1);
             if (sortBy === 'updatedAt') return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
-            return (a.subject || '').localeCompare(b.subject || '');
+            return subjectLabel(a).localeCompare(subjectLabel(b));
         });
 
         const limit = parseInt(questionLimit, 10);

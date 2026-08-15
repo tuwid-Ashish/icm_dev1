@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { parseCSVQuestions } from '../../services/csvParserService.js';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../common/Modal.jsx';
+import { SUBJECT_CODES } from '../../constants/subjectCodes.js';
 
 export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
     const [rawText, setRawText] = useState('');
@@ -140,7 +141,7 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                         <textarea
                             className="form-control"
                             style={{ minHeight: '140px', fontFamily: 'monospace', fontSize: '0.8rem' }}
-                            placeholder={`batch,subject,text,optionA,optionB,optionC,optionD,correctIndex,marks,explanation\n"Police Bharti","Mathematics","15 + 25 = ?","35","40","45","50",1,1,"15 + 25 equals 40."\n"Police Bharti;SSC GD","Mathematics","20 - 5 = ?","10","15","20","25",1,1,"20 - 5 equals 15."`}
+                            placeholder={`batch,subject,text,optionA,optionB,optionC,optionD,correctIndex,marks,explanation\n"Police Bharti","M1","15 + 25 = ?","35","40","45","50",1,1,"15 + 25 equals 40."\n"Police Bharti;SSC GD","M1","20 - 5 = ?","10","15","20","25",1,1,"20 - 5 equals 15."`}
                             value={rawText}
                             onChange={e => setRawText(e.target.value)}
                         />
@@ -150,6 +151,13 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                         <strong>Expected Header Columns:</strong> <code>id, batch, subject, questionText, optionA, optionB, optionC, optionD, correctOption, marks</code>
                         <br />
                         <strong>Multiple batches for one question?</strong> Separate them with a semicolon inside the batch cell — e.g. <code>Police Bharti;SSC GD</code> (not a comma, since commas already separate CSV columns).
+                        <br />
+                        <strong>Subject column:</strong> use the fixed subject code below (not the subject name) to avoid spelling mismatches — a recognizable name still works as a fallback.
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                            {SUBJECT_CODES.map(s => (
+                                <span key={s.code} className="badge badge-purple" style={{ fontSize: '0.72rem' }}>{s.code} = {s.name}</span>
+                            ))}
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -180,7 +188,7 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                                                 <span key={b} className="badge badge-purple">{b}</span>
                                             ))}
                                         </td>
-                                        <td><strong>{q.subject}</strong></td>
+                                        <td><span className="badge badge-orange">{q.subjectCode}</span> <strong>{q.subject}</strong></td>
                                         <td style={{ maxWidth: '220px' }}>{q.text}</td>
                                         <td><small>{q.options.join(' | ')}</small></td>
                                         <td><span className="badge badge-success">Opt {String.fromCharCode(65 + q.correctIndex)}</span></td>

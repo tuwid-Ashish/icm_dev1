@@ -8,6 +8,8 @@
  * the whole parser, not something this multi-batch change addresses.
  */
 
+import { resolveSubjectCode } from '../constants/subjectCodes.js';
+
 // Multiple batches in one CSV cell use ';' (not ',') specifically so they
 // survive the naive comma-based line split above without corrupting the row.
 function parseBatchCell(rawValue) {
@@ -31,12 +33,17 @@ export function parseCSVQuestions(csvText) {
             const ansLetter = (cols[8] || 'A').toUpperCase();
             const idxMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
             const batches = parseBatchCell(cols[1]);
+            // Subject column accepts either a fixed code (M1..M9) or a free-text
+            // name — resolved to a canonical code so spelling mismatches between
+            // the sheet and existing data no longer reject valid questions.
+            const resolvedSubject = resolveSubjectCode(cols[2]);
 
             questions.push({
                 id: cols[0] || 'Q-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
                 batches,
                 batch: batches.join(', '),
-                subject: cols[2] || 'General Knowledge',
+                subjectCode: resolvedSubject.code,
+                subject: resolvedSubject.name,
                 text: cols[3],
                 options: [cols[4] || '', cols[5] || '', cols[6] || '', cols[7] || ''],
                 correctIndex: idxMap[ansLetter] !== undefined ? idxMap[ansLetter] : 0,
