@@ -5,20 +5,22 @@ import { Modal } from '../../components/common/Modal.jsx';
 import { MathRenderer } from '../../components/common/MathRenderer.jsx';
 
 export const TestSimulatorPage = () => {
-    const { 
-        activeSession, 
-        currentQuestionIdx, 
-        timerSeconds, 
-        updateAnswer, 
-        clearAnswer, 
-        markForReview, 
-        saveAndNext, 
-        jumpToQuestion, 
-        submitCurrentTest
+    const {
+        activeSession,
+        currentQuestionIdx,
+        timerSeconds,
+        updateAnswer,
+        clearAnswer,
+        markForReview,
+        saveAndNext,
+        jumpToQuestion,
+        submitCurrentTest,
+        exitPracticeTest
     } = useExam();
 
     const { t } = useLanguage();
     const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+    const [exitModalOpen, setExitModalOpen] = useState(false);
 
     if (!activeSession || !activeSession.questions || activeSession.questions.length === 0) {
         return <div className="card"><p>No active practice session found.</p></div>;
@@ -67,18 +69,28 @@ export const TestSimulatorPage = () => {
         submitCurrentTest();
     };
 
+    const handleConfirmExit = () => {
+        setExitModalOpen(false);
+        exitPracticeTest();
+    };
+
     return (
         <div className="cbt-shell">
             {/* Topbar with Prominent Digital Timer Header Box */}
             <div className="cbt-topbar">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span className="badge badge-orange">{activeSession.examCode}</span>
-                    <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', fontWeight: 800 }}>{activeSession.examName}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+                    <span className="badge badge-orange" style={{ flexShrink: 0 }}>{activeSession.examCode}</span>
+                    <h3 className="cbt-exam-title" style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', fontWeight: 800 }}>{activeSession.examName}</h3>
                 </div>
 
-                <div className={`cbt-timer-box ${isTimerWarning ? 'alert' : ''}`}>
-                    <span>Time Remaining:</span>
-                    <span>{timeStr}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <div className={`cbt-timer-box ${isTimerWarning ? 'alert' : ''}`}>
+                        <span className="cbt-timer-label">{t('time_remaining')}:</span>
+                        <span>{timeStr}</span>
+                    </div>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setExitModalOpen(true)}>
+                        {t('exit_exam_btn')}
+                    </button>
                 </div>
             </div>
 
@@ -214,6 +226,24 @@ export const TestSimulatorPage = () => {
                     <div>Unattempted / Jumped: <strong style={{ color: 'var(--warning)' }}>{visitedCount + notVisitedCount}</strong></div>
                     <div>Marked for Review: <strong style={{ color: 'var(--purple)' }}>{markedCount + answeredMarkedCount}</strong></div>
                 </div>
+            </Modal>
+
+            {/* Exit Confirmation Dialog — abandons the attempt without submitting */}
+            <Modal
+                isOpen={exitModalOpen}
+                onClose={() => setExitModalOpen(false)}
+                title={t('confirm_exit_title')}
+                maxWidth="480px"
+                footer={
+                    <>
+                        <button className="btn btn-secondary" onClick={() => setExitModalOpen(false)}>{t('return_to_test_btn')}</button>
+                        <button className="btn btn-danger" onClick={handleConfirmExit}>{t('confirm_exit_btn')}</button>
+                    </>
+                }
+            >
+                <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
+                    {t('confirm_exit_desc')}
+                </p>
             </Modal>
         </div>
     );

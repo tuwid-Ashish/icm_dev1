@@ -815,14 +815,43 @@ textarea.form-control { resize: vertical; min-height: 100px; }
     }
 
     .cbt-topbar {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        gap: 0.75rem !important;
+        /* Stays inline (title + timer side by side) rather than stacking —
+           the title truncates with an ellipsis instead of wrapping so the
+           timer/Exit button never get pushed off-screen. */
+        padding: 0.75rem 1rem !important;
+        gap: 0.4rem !important;
+    }
+
+    .cbt-topbar .badge {
+        padding: 0.25rem 0.5rem !important;
+        font-size: 0.7rem !important;
+    }
+
+    .cbt-exam-title {
+        font-size: 0.95rem !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+    }
+
+    /* "Timer:" label hides on mobile — just the countdown value shows —
+       so the exam code badge + title always keep some real width instead
+       of getting squeezed to nothing by a wide timer box. */
+    .cbt-timer-label {
+        display: none;
     }
 
     .cbt-timer-box {
-        width: 100% !important;
-        justify-content: space-between !important;
+        padding: 0.4rem 0.6rem !important;
+        font-size: 1rem !important;
+        gap: 0.3rem;
+        display: flex;
+    }
+
+    .cbt-topbar .btn-sm {
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.8rem !important;
     }
 
     .cbt-main-grid {

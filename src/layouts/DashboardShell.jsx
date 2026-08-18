@@ -40,6 +40,11 @@ export const DashboardShell = ({ children }) => {
     };
 
     const ready = !authLoading && user && user.role === 'student';
+    // Hidden on the hub itself (nothing to go "back" to), and during an
+    // active test / fresh result — a test in progress shouldn't offer an
+    // easy way to navigate away mid-attempt, and the result screen already
+    // has its own "Back to Dashboard" action.
+    const showBackButton = ready && router.pathname !== '/dashboard' && !activeSession && !activeResult;
 
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-body)' }}>
@@ -48,6 +53,16 @@ export const DashboardShell = ({ children }) => {
             <main style={{ flex: 1, minWidth: 0 }}>
                 {!ready ? null : (
                     <div className="container">
+                        {showBackButton && (
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ marginBottom: '1.25rem' }}
+                                onClick={() => router.push('/dashboard')}
+                            >
+                                ← Back to Dashboard
+                            </button>
+                        )}
                         {activeSession ? (
                             <TestSimulatorPage />
                         ) : activeResult ? (

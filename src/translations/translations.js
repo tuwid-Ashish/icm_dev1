@@ -62,6 +62,8 @@ export const translations = {
         nav_new_package_desc: "Buy a new exam package",
         nav_free_tests: "Free Tests",
         nav_free_tests_desc: "Practice for free and prepare",
+        nav_exam_catalog: "Start Exam",
+        nav_exam_catalog_desc: "Browse boards and start a test",
         available_packages_title: "Available Course Packages & Practice Bundles",
         available_packages_desc: "Purchase test series packages via Razorpay to instantly unlock paid mock exams.",
         buy_package_razorpay: "Buy Package (Razorpay Payment)",
@@ -131,14 +133,14 @@ export const translations = {
         no_history_matches: "No test attempt logs match your search.",
 
         // CBT Test Simulator
-        time_remaining: "Time Remaining",
+        time_remaining: "Timer",
         question_prefix: "Question",
         of_text: "of",
         marks_info: "Marks",
         penalty_info: "Penalty",
         previous_btn: "Previous",
         clear_choice_btn: "Clear Choice",
-        mark_for_review_btn: "Mark for Review",
+        mark_for_review_btn: "Solve Later",
         save_next_btn: "Save & Next",
         save_review_btn: "Save & Review Test",
         verify_submit_btn: "Verify & Submit Test",
@@ -154,6 +156,10 @@ export const translations = {
         confirm_submission_desc: "Are you sure you want to finalize and submit your test paper?",
         finalize_submit_btn: "Finalize & Submit",
         return_to_test_btn: "Return to Test",
+        exit_exam_btn: "Exit",
+        confirm_exit_title: "Quit this exam?",
+        confirm_exit_desc: "Your answers so far will not be submitted or saved, and this attempt will not count against your test quota. Are you sure you want to quit?",
+        confirm_exit_btn: "Yes, Quit Exam",
 
         // Scorecard / Result Page
         scorecard_qualified: "QUALIFIED / PASSED",
@@ -304,6 +310,8 @@ export const translations = {
         nav_new_package_desc: "नवीन परीक्षा पॅकेज खरेदी करा",
         nav_free_tests: "मोफत टेस्ट",
         nav_free_tests_desc: "मोफत सराव करा आणि तयारी करा",
+        nav_exam_catalog: "परीक्षा सुरू करा",
+        nav_exam_catalog_desc: "मंडळे पहा आणि परीक्षा सुरू करा",
         available_packages_title: "उपलब्ध कोर्स पॅकेजेस आणि सराव बंडल",
         available_packages_desc: "पेड मॉक परीक्षा त्वरित अनलॉक करण्यासाठी रेझरपे (Razorpay) द्वारे चाचणी मालिका पॅकेजेस खरेदी करा.",
         buy_package_razorpay: "पॅकेज खरेदी करा (रेझरपे पेमेंट)",
@@ -373,14 +381,14 @@ export const translations = {
         no_history_matches: "तुमच्या शोधाशी सुसंगत कोणताही चाचणी लॉग सापडला नाही.",
 
         // CBT Test Simulator
-        time_remaining: "उरलेली वेळ",
+        time_remaining: "टायमर",
         question_prefix: "प्रश्न",
         of_text: "पैकी",
         marks_info: "गुण",
         penalty_info: "दंड",
         previous_btn: "मागील",
         clear_choice_btn: "पर्याय हटवा",
-        mark_for_review_btn: "पुनरावलोकनासाठी चिन्हांकित करा",
+        mark_for_review_btn: "नंतर सोडवा",
         save_next_btn: "जतन करा आणि पुढे जा",
         save_review_btn: "जतन करा आणि पुनरावलोकन करा",
         verify_submit_btn: "चाचणी सादर करा",
@@ -396,6 +404,10 @@ export const translations = {
         confirm_submission_desc: "तुम्हाला तुमची प्रश्नपत्रिका अंतिम करून सबमिट करायची आहे का?",
         finalize_submit_btn: "अंतिम करा आणि सबमिट करा",
         return_to_test_btn: "चाचणीवर परत जा",
+        exit_exam_btn: "बाहेर पडा",
+        confirm_exit_title: "ही परीक्षा सोडायची आहे का?",
+        confirm_exit_desc: "आत्तापर्यंतची तुमची उत्तरे सबमिट किंवा जतन केली जाणार नाहीत, आणि हा प्रयत्न तुमच्या टेस्ट कोट्यातून वजा होणार नाही. तुम्हाला खरंच बाहेर पडायचे आहे का?",
+        confirm_exit_btn: "होय, परीक्षा सोडा",
 
         // Scorecard / Result Page
         scorecard_qualified: "पात्र / उत्तीर्ण (QUALIFIED)",

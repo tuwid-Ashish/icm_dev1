@@ -235,6 +235,15 @@ export const ExamProvider = ({ children }) => {
         setActiveResult(evaluated);
     };
 
+    // Abandon the current test without submitting — no scorecard is saved
+    // and, since quota is only ever decremented on a real submit, no
+    // quota slot is consumed either. Used by the "Exit" confirmation on
+    // the exam screen.
+    const exitPracticeTest = () => {
+        updateActiveSession(null);
+        setTimerSeconds(0);
+    };
+
     return (
         <ExamContext.Provider value={{
             activeSession,
@@ -249,7 +258,8 @@ export const ExamProvider = ({ children }) => {
             markForReview,
             saveAndNext,
             jumpToQuestion,
-            submitCurrentTest
+            submitCurrentTest,
+            exitPracticeTest
         }}>
             {children}
         </ExamContext.Provider>
