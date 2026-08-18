@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext.jsx';
-import { ExamProvider, useExam } from './context/ExamContext.jsx';
-import { ThemeProvider } from './context/ThemeContext.jsx';
-import { LanguageProvider } from './context/LanguageContext.jsx';
+import { useRouter } from 'next/router';
+import { useAuth } from './context/AuthContext.jsx';
 import { storageService } from './services/storageService.js';
 
 import { Navbar } from './components/common/Navbar.jsx';
@@ -10,132 +8,111 @@ import { LandingPage } from './pages/LandingPage.jsx';
 import { LoginPage } from './pages/auth/LoginPage.jsx';
 import { SignupPage } from './pages/auth/SignupPage.jsx';
 
-import { StudentDashboardPage } from './pages/student/StudentDashboardPage.jsx';
-import { ExamCatalogPage } from './pages/student/ExamCatalogPage.jsx';
-import { TestSimulatorPage } from './pages/student/TestSimulatorPage.jsx';
-import { TestResultPage } from './pages/student/TestResultPage.jsx';
-import { HistoryPage } from './pages/student/HistoryPage.jsx';
-
 import { AdminLoginPage } from './pages/admin/AdminLoginPage.jsx';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage.jsx';
 
 // Global CSS (theme.css, components.css) is imported once in pages/_app.js —
 // Next.js only allows global stylesheet imports from the custom App.
+// Context providers also live in pages/_app.js now (src/context/AppProviders.jsx)
+// so they persist across Next.js page navigations instead of remounting on
+// every route change — this component only consumes them.
 
+// Everything under the student dashboard (/dashboard, /dashboard/history,
+// /dashboard/exams, etc.) is a real Next.js route now (see pages/dashboard/*),
+// each wrapped in its own src/layouts/DashboardShell.jsx — this component no
+// longer renders those directly. It still owns: the public landing page,
+// student login/signup, and the admin portal (none of which needed splitting
+// into dedicated pages).
 const MainAppContent = () => {
-    const { user, logout } = useAuth();
-    const { activeSession, activeResult, setActiveResult } = useExam();
+    const router = useRouter();
+    const { user } = useAuth();
 
-    // Navigation state: 'home' | 'login' | 'signup' | 'dashboard' | 'exams' | 'history' | 'admin_login' | 'admin_dashboard'
-    // Initialized from the locally cached auth profile (not just Firebase's async
-    // onAuthStateChanged) so a page reload between tests lands an already-logged-in
-    // student back on their dashboard instead of the logged-out landing page —
-    // the landing page made it look like the session had been lost even though the
-    // Firebase auth token itself was still valid.
-    const [currentRoute, setCurrentRoute] = useState(() => {
-        const cached = storageService.getCurrentUser();
-        if (cached?.role === 'admin') return 'admin_dashboard';
-        if (cached?.role === 'student') return 'dashboard';
-        return 'home';
-    });
+    // Navigation state: 'home' | 'login' | 'signup' | 'admin_login' | 'admin_dashboard'
+    const [currentRoute, setCurrentRoute] = useState('home');
+    // Gates rendering until we've decided whether an already-authenticated
+    // visitor to '/' should be bounced to their real dashboard/admin route,
+    // so they don't see a flash of the landing page first.
+    const [routeReady, setRouteReady] = useState(false);
 
-    // Handle URL path inspection for isolated /admin route
     useEffect(() => {
         const path = window.location.pathname.toLowerCase();
+
         if (path === '/admin' || path.startsWith('/admin')) {
-            if (user && user.role === 'admin') {
-                setCurrentRoute('admin_dashboard');
-            } else {
-                setCurrentRoute('admin_login');
-            }
+            setCurrentRoute(user && user.role === 'admin' ? 'admin_dashboard' : 'admin_login');
+            setRouteReady(true);
+            return;
         }
+
+        // Landing on '/' — an already-authenticated student/admin belongs on
+        // their real dashboard route, not the logged-out marketing page.
+        const cached = storageService.getCurrentUser();
+        if (cached?.role === 'student') {
+            router.replace('/dashboard');
+            return;
+        }
+        if (cached?.role === 'admin') {
+            router.replace('/admin');
+            return;
+        }
+        setCurrentRoute('home');
+        setRouteReady(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     const handleNavigate = (route) => {
-        // Guard admin dashboard
-        if (route === 'admin_dashboard' && (!user || user.role !== 'admin')) {
-            setCurrentRoute('admin_login');
+        if (route === 'dashboard' || route === 'exams' || route === 'history') {
+            if (user && user.role === 'admin') {
+                setCurrentRoute('admin_dashboard');
+                return;
+            }
+            router.push(route === 'dashboard' ? '/dashboard' : `/dashboard/${route}`);
             return;
         }
-        // Guard student protected routes
-        if ((route === 'dashboard' || route === 'exams' || route === 'history') && user && user.role === 'admin') {
-            setCurrentRoute('admin_dashboard');
+        if (route === 'admin_dashboard' && (!user || user.role !== 'admin')) {
+            setCurrentRoute('admin_login');
             return;
         }
         setCurrentRoute(route);
     };
 
+    if (!routeReady) return null;
+
     return (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-body)' }}>
-            <Navbar 
+            <Navbar
                 activeRoute={currentRoute}
                 onNavigate={handleNavigate}
             />
 
             {/* min-width: 0 overrides the flex item default of min-width: auto —
-                without it, a wide child (like the 4-column packages grid) makes
-                this flex item grow to fit its content's min-content width
-                instead of constraining it, pushing the whole page into
-                horizontal overflow instead of letting the grid wrap. */}
+                without it, a wide child makes this flex item grow to fit its
+                content's min-content width instead of constraining it, pushing
+                the whole page into horizontal overflow instead of wrapping. */}
             <main style={{ flex: 1, minWidth: 0 }}>
-                {/* Active CBT Test Session (Blocked for Admins) */}
-                {activeSession && user?.role === 'student' ? (
-                    <div className="container">
-                        <TestSimulatorPage />
-                    </div>
-                ) : activeResult ? (
-                    <div className="container">
-                        <TestResultPage result={activeResult} onBack={() => setActiveResult(null)} />
-                    </div>
-                ) : (
-                    <>
-                        {currentRoute === 'home' && <LandingPage onNavigate={handleNavigate} />}
-                        {currentRoute === 'login' && <LoginPage onSwitchToSignup={() => setCurrentRoute('signup')} onLoginSuccess={() => setCurrentRoute('dashboard')} />}
-                        {currentRoute === 'signup' && <SignupPage onSwitchToLogin={() => setCurrentRoute('login')} onSignupSuccess={() => setCurrentRoute('dashboard')} />}
-                        
-                        {/* Student Dashboard (Requires Student Role) */}
-                        {currentRoute === 'dashboard' && user && user.role === 'student' && (
-                            <div className="container">
-                                <StudentDashboardPage onNavigate={handleNavigate} />
-                            </div>
-                        )}
+                {currentRoute === 'home' && <LandingPage onNavigate={handleNavigate} />}
+                {currentRoute === 'login' && <LoginPage onSwitchToSignup={() => setCurrentRoute('signup')} onLoginSuccess={() => router.push('/dashboard')} />}
+                {currentRoute === 'signup' && <SignupPage onSwitchToLogin={() => setCurrentRoute('login')} onSignupSuccess={() => router.push('/dashboard')} />}
 
-                        {/* Exam Catalog & Syllabus Explorer */}
-                        {currentRoute === 'exams' && user && user.role === 'student' && (
-                            <div className="container">
-                                <ExamCatalogPage />
-                            </div>
-                        )}
+                {/* Isolated Admin Login */}
+                {currentRoute === 'admin_login' && (
+                    user && user.role === 'admin' ? (
+                        <div className="container">
+                            <AdminDashboardPage onNavigate={handleNavigate} />
+                        </div>
+                    ) : (
+                        <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
+                    )
+                )}
 
-                        {/* Test History & Subject Analytics */}
-                        {currentRoute === 'history' && user && user.role === 'student' && (
-                            <div className="container">
-                                <HistoryPage onViewResult={setActiveResult} />
-                            </div>
-                        )}
-
-                        {/* Isolated Admin Login */}
-                        {currentRoute === 'admin_login' && (
-                            user && user.role === 'admin' ? (
-                                <div className="container">
-                                    <AdminDashboardPage onNavigate={handleNavigate} />
-                                </div>
-                            ) : (
-                                <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
-                            )
-                        )}
-
-                        {/* Admin Portal Dashboard (Protected Admin Route) */}
-                        {currentRoute === 'admin_dashboard' && (
-                            user && user.role === 'admin' ? (
-                                <div className="container">
-                                    <AdminDashboardPage onNavigate={handleNavigate} />
-                                </div>
-                            ) : (
-                                <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
-                            )
-                        )}
-                    </>
+                {/* Admin Portal Dashboard (Protected Admin Route) */}
+                {currentRoute === 'admin_dashboard' && (
+                    user && user.role === 'admin' ? (
+                        <div className="container">
+                            <AdminDashboardPage onNavigate={handleNavigate} />
+                        </div>
+                    ) : (
+                        <AdminLoginPage onAdminLoginSuccess={() => setCurrentRoute('admin_dashboard')} />
+                    )
                 )}
             </main>
         </div>
@@ -143,15 +120,5 @@ const MainAppContent = () => {
 };
 
 export default function App() {
-    return (
-        <ThemeProvider>
-            <AuthProvider>
-                <LanguageProvider>
-                    <ExamProvider>
-                        <MainAppContent />
-                    </ExamProvider>
-                </LanguageProvider>
-            </AuthProvider>
-        </ThemeProvider>
-    );
+    return <MainAppContent />;
 }
