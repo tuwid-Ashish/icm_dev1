@@ -111,22 +111,22 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                     <div className="stat-sub">{t('scorecards_evaluated')}</div>
                 </div>
 
-                <div className="stat-card" style={{ borderLeft: '4px solid var(--purple)' }}>
+                {/* <div className="stat-card" style={{ borderLeft: '4px solid var(--purple)' }}>
                     <div className="stat-title">📦 {t('purchased_packages')}</div>
                     <div className="stat-val" style={{ color: 'var(--purple)' }}>{userProfile && userProfile.purchasedPackages ? userProfile.purchasedPackages.length : 0} {t('plans_unit')}</div>
                     <div className="stat-sub">{t('active_subscriptions')}</div>
-                </div>
+                </div> */}
             </div>
 
             {/* Quick Action Navigation Cards */}
             <div className="nav-actions-grid">
-                <NavActionCard
+                {/* <NavActionCard
                     icon="📄"
                     color="#4338ca"
                     title={t('nav_active_package')}
                     description={t('nav_active_package_desc')}
                     onClick={() => scrollTo(packagesRef)}
-                />
+                /> */}
                 <NavActionCard
                     icon="🕐"
                     color="#0891b2"
@@ -249,7 +249,7 @@ export const StudentDashboardPage = ({ onNavigate }) => {
                                     </div>
 
                                     <button className={`btn ${unlocked ? 'btn-primary' : 'btn-secondary'}`} style={{ width: '100%', fontWeight: 700 }}>
-                                        {e.isFreeTest ? 'Launch Free Test' : unlocked ? 'Configure & Launch Test' : access.reason === 'quota_exhausted' ? 'Quota Exhausted (Buy More)' : 'Unlock Mock Exam (Buy Package)'}
+                                        {e.isFreeTest ? 'Start Free Test' : unlocked ? 'Start Test' : access.reason === 'quota_exhausted' ? 'Quota Exhausted (Buy More)' : 'Unlock Mock Exam (Buy Package)'}
                                     </button>
                                 </div>
                             );

@@ -141,28 +141,28 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     };
 
     // Instant Simulated Test Payment for sandbox testing without real Razorpay account
-    const handleSimulatedPayment = async () => {
-        setLoading(true);
-        setErrorMessage('');
-        const mockPaymentId = 'pay_sim_' + Math.random().toString(36).substring(2, 10);
-        const res = await firestoreEngine.processRazorpayPaymentSuccess({
-            student: user,
-            pkg,
-            paymentId: mockPaymentId,
-            amount: amountToPay
-        });
-        setLoading(false);
-        if (res.success) {
-            setSuccessPaymentId(mockPaymentId);
-            setSuccessMessage(t('quota_credited_msg'));
-            setTimeout(() => {
-                if (onSuccess) onSuccess(res.user);
-                onClose();
-            }, 2500);
-        } else {
-            setErrorMessage('Simulated payment failed.');
-        }
-    };
+    // const handleSimulatedPayment = async () => {
+    //     setLoading(true);
+    //     setErrorMessage('');
+    //     const mockPaymentId = 'pay_sim_' + Math.random().toString(36).substring(2, 10);
+    //     const res = await firestoreEngine.processRazorpayPaymentSuccess({
+    //         student: user,
+    //         pkg,
+    //         paymentId: mockPaymentId,
+    //         amount: amountToPay
+    //     });
+    //     setLoading(false);
+    //     if (res.success) {
+    //         setSuccessPaymentId(mockPaymentId);
+    //         setSuccessMessage(t('quota_credited_msg'));
+    //         setTimeout(() => {
+    //             if (onSuccess) onSuccess(res.user);
+    //             onClose();
+    //         }, 2500);
+    //     } else {
+    //         setErrorMessage('Simulated payment failed.');
+    //     }
+    // };
 
     const handleManualUtrSubmit = async (e) => {
         e.preventDefault();
@@ -249,7 +249,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                     </div>
 
                     {/* Payment Method Switcher Tabs */}
-                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                    {/* <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                         <button
                             type="button"
                             onClick={() => setPaymentMethodTab('razorpay')}
@@ -284,7 +284,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                         >
                             📲 Manual QR & UTR
                         </button>
-                    </div>
+                    </div> */}
 
                     {errorMessage && (
                         <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
@@ -316,7 +316,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                                 )}
                             </button>
 
-                            <button
+                            {/* <button
                                 type="button"
                                 className="btn btn-secondary"
                                 disabled={loading}
@@ -324,7 +324,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                                 style={{ width: '100%', marginTop: '0.65rem', padding: '0.65rem', fontSize: '0.85rem', fontWeight: 700 }}
                             >
                                 🧪 Test Mode: Simulate Instant Quota Credit (Without Key)
-                            </button>
+                            </button> */}
                         </div>
                     ) : (
                         <form onSubmit={handleManualUtrSubmit}>
