@@ -46,14 +46,17 @@ class ExamEngine {
         const allQuestions = await firestoreEngine.getQuestions();
 
         // 1. Filter Questions for the target Exam Batch — matched via an
-        // explicit exam-id -> batch-tag mapping (EXAM_ID_TO_BATCH), not by
-        // fuzzy-matching the exam's display name against the batch tag.
-        // The old name-based matching never actually matched (Marathi exam
-        // names don't contain the ASCII "police"/"ssc"/"vanrakshak" substrings
-        // it checked for, and "police bharti" vs "police_bharti" never lined
-        // up either), so every exam silently fell through to drawing from the
-        // entire question bank across all boards instead of its own.
-        const targetBatch = EXAM_ID_TO_BATCH[exam.id];
+        // explicit batch tag, not by fuzzy-matching the exam's display name
+        // against it. The old name-based matching never actually matched
+        // (Marathi exam names don't contain the ASCII "police"/"ssc"/
+        // "vanrakshak" substrings it checked for, and "police bharti" vs
+        // "police_bharti" never lined up either), so every exam silently
+        // fell through to drawing from the entire question bank across all
+        // boards instead of its own.
+        // Admin-created free tests set exam.questionBatch directly (picked
+        // from a dropdown); the 3 fixed paid exams fall back to the static
+        // EXAM_ID_TO_BATCH mapping.
+        const targetBatch = exam.questionBatch || EXAM_ID_TO_BATCH[exam.id];
         let batchQuestions = targetBatch
             ? allQuestions.filter(q => {
                 if (Array.isArray(q.batches)) {

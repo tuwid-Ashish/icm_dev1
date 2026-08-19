@@ -74,6 +74,9 @@ export const FreeTestsPage = () => {
                         {exams.map(e => {
                             const access = getExamAccess(userProfile, e);
                             const alreadyUsed = access.reason === 'free_test_used';
+                            const attemptsLimit = access.attemptsLimit || e.freeAttemptLimit || 1;
+                            const attemptsUsed = access.attemptsUsed || 0;
+                            const attemptsRemaining = Math.max(0, attemptsLimit - attemptsUsed);
                             return (
                                 <div
                                     key={e.id}
@@ -85,7 +88,7 @@ export const FreeTestsPage = () => {
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                                             <div className="exam-card-medium">{e.medium}</div>
                                             <span className={`badge ${alreadyUsed ? 'badge-warning' : 'badge-success'}`}>
-                                                {alreadyUsed ? 'ALREADY ATTEMPTED' : t('free_test_badge')}
+                                                {alreadyUsed ? 'ALREADY ATTEMPTED' : attemptsLimit > 1 ? `${attemptsRemaining}/${attemptsLimit} ATTEMPTS LEFT` : t('free_test_badge')}
                                             </span>
                                         </div>
 
@@ -105,7 +108,7 @@ export const FreeTestsPage = () => {
 
                                         {alreadyUsed && (
                                             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: 600 }}>
-                                                You've already used your one free attempt for this test.
+                                                You've used all {attemptsLimit} of your free attempt{attemptsLimit === 1 ? '' : 's'} for this test.
                                             </p>
                                         )}
                                     </div>

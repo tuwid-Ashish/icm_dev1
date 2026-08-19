@@ -10,7 +10,9 @@ export const LandingPage = ({ onNavigate }) => {
         let isMounted = true;
         async function loadExams() {
             const loaded = await firestoreEngine.getExams();
-            if (isMounted) setExams(loaded);
+            // Free tests only appear on the post-login Free Tests page,
+            // not on the public homepage's recruitment board list.
+            if (isMounted) setExams(loaded.filter(e => !e.isFreeTest));
         }
         loadExams();
         return () => { isMounted = false; };

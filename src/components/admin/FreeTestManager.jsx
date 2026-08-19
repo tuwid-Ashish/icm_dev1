@@ -1,35 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../common/Modal.jsx';
+import { EXAM_BATCHES } from '../../constants/examBatches.js';
 
-export const ExamConfigList = ({ onRefresh }) => {
+// Dedicated admin surface for free-test exams — kept separate from
+// ExamConfigList (paid exam blueprints) per client requirement: free tests
+// "should not come under exam test." Same underlying `exams` collection
+// (isFreeTest: true), but its own list/create/edit/delete flow so admins
+// can add more free tests over time without them mixing into the paid
+// blueprint list.
+export const FreeTestManager = ({ onRefresh }) => {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState(null);
 
-    // Form state
     const [code, setCode] = useState('');
     const [name, setName] = useState('');
     const [medium, setMedium] = useState('Marathi/English');
-    const [durationMinutes, setDurationMinutes] = useState(90);
-    const [negativeMarkingRate, setNegativeMarkingRate] = useState(0.25);
+    const [durationMinutes, setDurationMinutes] = useState(20);
+    const [negativeMarkingRate, setNegativeMarkingRate] = useState(0);
     const [minQualifyingPercent, setMinQualifyingPercent] = useState(40);
+    const [freeAttemptLimit, setFreeAttemptLimit] = useState(1);
+    const [questionBatch, setQuestionBatch] = useState(EXAM_BATCHES[0]);
 
-    // Subject breakdown state
     const [subjectBreakdown, setSubjectBreakdown] = useState([
-        { name: 'Mathematics', questionsCount: 25, marksPerQuestion: 1 },
-        { name: 'Reasoning Ability', questionsCount: 25, marksPerQuestion: 1 },
-        { name: 'General Knowledge & Current Affairs', questionsCount: 25, marksPerQuestion: 1 },
-        { name: 'Marathi Grammar / Verbal', questionsCount: 25, marksPerQuestion: 1 }
+        { name: 'Mathematics', questionsCount: 5, marksPerQuestion: 1 },
+        { name: 'Reasoning Ability', questionsCount: 5, marksPerQuestion: 1 },
+        { name: 'General Knowledge', questionsCount: 5, marksPerQuestion: 1 },
+        { name: 'Marathi Language', questionsCount: 5, marksPerQuestion: 1 }
     ]);
 
     const loadExams = async () => {
         setLoading(true);
         const examList = await firestoreEngine.getExams();
-        // Free tests are managed exclusively from the dedicated "Free Tests"
-        // admin tab now, not mixed in with paid exam blueprints here.
-        setExams(examList.filter(e => !e.isFreeTest));
+        setExams(examList.filter(e => e.isFreeTest));
         setLoading(false);
     };
 
@@ -43,34 +48,36 @@ export const ExamConfigList = ({ onRefresh }) => {
             setCode(exam.code || exam.id);
             setName(exam.name || exam.title);
             setMedium(exam.medium || 'Marathi/English');
-            setDurationMinutes(exam.durationMinutes || 90);
-            setNegativeMarkingRate(exam.negativeMarkingRate || 0.25);
+            setDurationMinutes(exam.durationMinutes || 20);
+            setNegativeMarkingRate(exam.negativeMarkingRate || 0);
             setMinQualifyingPercent(exam.minQualifyingPercent || 40);
+            setFreeAttemptLimit(exam.freeAttemptLimit || 1);
+            setQuestionBatch(exam.questionBatch || EXAM_BATCHES[0]);
 
             if (exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0) {
-                // Older blueprints saved before marksPerQuestion existed — default to 1
-                // so the field is never undefined (that's what produced NaN Marks).
                 setSubjectBreakdown(exam.subjects.map(s => ({ ...s, marksPerQuestion: s.marksPerQuestion || 1 })));
             } else {
                 setSubjectBreakdown([
-                    { name: 'Mathematics', questionsCount: 25, marksPerQuestion: 1 },
-                    { name: 'Reasoning Ability', questionsCount: 25, marksPerQuestion: 1 },
-                    { name: 'General Knowledge', questionsCount: 25, marksPerQuestion: 1 },
-                    { name: 'Marathi Language', questionsCount: 25, marksPerQuestion: 1 }
+                    { name: 'Mathematics', questionsCount: 5, marksPerQuestion: 1 },
+                    { name: 'Reasoning Ability', questionsCount: 5, marksPerQuestion: 1 },
+                    { name: 'General Knowledge', questionsCount: 5, marksPerQuestion: 1 },
+                    { name: 'Marathi Language', questionsCount: 5, marksPerQuestion: 1 }
                 ]);
             }
         } else {
-            setCode('MH-POLICE-2026');
-            setName('Maharashtra Police Bharti Mega Mock Test');
+            setCode('FREE-TEST-2026');
+            setName('New Free Test');
             setMedium('Marathi/English');
-            setDurationMinutes(90);
-            setNegativeMarkingRate(0.25);
+            setDurationMinutes(20);
+            setNegativeMarkingRate(0);
             setMinQualifyingPercent(40);
+            setFreeAttemptLimit(1);
+            setQuestionBatch(EXAM_BATCHES[0]);
             setSubjectBreakdown([
-                { name: 'Mathematics', questionsCount: 25, marksPerQuestion: 1 },
-                { name: 'Reasoning Ability', questionsCount: 25, marksPerQuestion: 1 },
-                { name: 'General Knowledge', questionsCount: 25, marksPerQuestion: 1 },
-                { name: 'Marathi Language', questionsCount: 25, marksPerQuestion: 1 }
+                { name: 'Mathematics', questionsCount: 5, marksPerQuestion: 1 },
+                { name: 'Reasoning Ability', questionsCount: 5, marksPerQuestion: 1 },
+                { name: 'General Knowledge', questionsCount: 5, marksPerQuestion: 1 },
+                { name: 'Marathi Language', questionsCount: 5, marksPerQuestion: 1 }
             ]);
         }
         setModalOpen(true);
@@ -83,13 +90,12 @@ export const ExamConfigList = ({ onRefresh }) => {
     };
 
     const handleAddSubject = () => {
-        setSubjectBreakdown([...subjectBreakdown, { name: 'New Subject', questionsCount: 10, marksPerQuestion: 1 }]);
+        setSubjectBreakdown([...subjectBreakdown, { name: 'New Subject', questionsCount: 5, marksPerQuestion: 1 }]);
     };
 
     const handleRemoveSubject = (index) => {
         if (subjectBreakdown.length <= 1) return;
-        const updated = subjectBreakdown.filter((_, i) => i !== index);
-        setSubjectBreakdown(updated);
+        setSubjectBreakdown(subjectBreakdown.filter((_, i) => i !== index));
     };
 
     const calculatedTotalQuestions = subjectBreakdown.reduce((sum, s) => sum + (s.questionsCount || 0), 0);
@@ -98,7 +104,7 @@ export const ExamConfigList = ({ onRefresh }) => {
     const handleSave = async (e) => {
         e.preventDefault();
         const examId = editingExam ? editingExam.id : code.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        
+
         const examData = {
             id: examId,
             code,
@@ -110,7 +116,9 @@ export const ExamConfigList = ({ onRefresh }) => {
             totalMarks: calculatedTotalMarks,
             negativeMarkingRate: parseFloat(negativeMarkingRate),
             minQualifyingPercent: parseInt(minQualifyingPercent, 10),
-            isFreeTest: false,
+            isFreeTest: true,
+            freeAttemptLimit: parseInt(freeAttemptLimit, 10) || 1,
+            questionBatch,
             subjects: subjectBreakdown,
             updatedAt: new Date().toISOString()
         };
@@ -122,7 +130,7 @@ export const ExamConfigList = ({ onRefresh }) => {
     };
 
     const handleDelete = async (examId) => {
-        if (!window.confirm('Are you sure you want to delete this exam blueprint? This cannot be undone, and any package still pointing at this exam will no longer unlock anything.')) return;
+        if (!window.confirm('Are you sure you want to delete this free test? This cannot be undone.')) return;
         await firestoreEngine.deleteExamBlueprint(examId);
         await loadExams();
         if (onRefresh) onRefresh();
@@ -132,11 +140,13 @@ export const ExamConfigList = ({ onRefresh }) => {
         <div className="card">
             <div className="card-header">
                 <div>
-                    <h3 className="card-title">Exam Blueprints & Subject Question Distributions</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Configure exam patterns, duration limits, subject-wise question allocations, and negative marking rates.</p>
+                    <h3 className="card-title">Free Tests</h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        Manage free-preview tests separately from paid exam blueprints — students see these only on the dedicated Free Tests page, never in Exam Catalog or the public homepage.
+                    </p>
                 </div>
                 <button className="btn btn-primary" onClick={() => handleOpenModal(null)}>
-                    + Create Exam Type
+                    + Create Free Test
                 </button>
             </div>
 
@@ -144,18 +154,19 @@ export const ExamConfigList = ({ onRefresh }) => {
                 <table className="data-table">
                     <thead>
                         <tr>
-                            <th>Exam Code & Title</th>
+                            <th>Free Test Code & Title</th>
                             <th>Duration</th>
                             <th>Subject Question Distribution</th>
                             <th>Total Marks</th>
-                            <th>Negative Marks</th>
-                            <th>Passing %</th>
+                            <th>Allowed Attempts</th>
                             <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Loading exam patterns from Cloud Firestore...</td></tr>
+                            <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Loading free tests from Cloud Firestore...</td></tr>
+                        ) : exams.length === 0 ? (
+                            <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No free tests configured yet.</td></tr>
                         ) : (
                             exams.map(e => (
                                 <tr key={e.id}>
@@ -171,12 +182,11 @@ export const ExamConfigList = ({ onRefresh }) => {
                                         </small>
                                     </td>
                                     <td><strong>{e.totalMarks} Marks</strong></td>
-                                    <td><span className="badge badge-danger">-{e.negativeMarkingRate}</span></td>
-                                    <td><span className="badge badge-success">{e.minQualifyingPercent || 40}%</span></td>
+                                    <td><span className="badge badge-success">{e.freeAttemptLimit || 1} attempt{(e.freeAttemptLimit || 1) === 1 ? '' : 's'}</span></td>
                                     <td style={{ whiteSpace: 'nowrap' }}>
                                         <div className="action-buttons-group">
                                             <button className="btn btn-secondary btn-sm" onClick={() => handleOpenModal(e)}>
-                                                Configure Blueprint
+                                                Configure
                                             </button>
                                             <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e.id)}>
                                                 Delete
@@ -190,40 +200,55 @@ export const ExamConfigList = ({ onRefresh }) => {
                 </table>
             </div>
 
-            {/* Exam Blueprint Modal */}
             <Modal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
-                title={editingExam ? 'Edit Exam Blueprint & Distribution' : 'Create New Exam Type'}
+                title={editingExam ? 'Edit Free Test' : 'Create New Free Test'}
                 maxWidth="740px"
                 onSubmit={handleSave}
                 footer={
                     <>
                         <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                        <button type="submit" className="btn btn-primary">Save Blueprint & Pattern</button>
+                        <button type="submit" className="btn btn-primary">Save Free Test</button>
                     </>
                 }
             >
                 <div className="form-group form-grid-2col">
                     <div>
-                        <label className="form-label">Exam Code</label>
+                        <label className="form-label">Free Test Code</label>
                         <input type="text" className="form-control" required value={code} onChange={e => setCode(e.target.value)} />
                     </div>
                     <div>
-                        <label className="form-label">Exam Title Name</label>
+                        <label className="form-label">Free Test Title</label>
                         <input type="text" className="form-control" required value={name} onChange={e => setName(e.target.value)} />
                     </div>
                 </div>
 
+                <div className="form-group form-grid-2col">
+                    <div>
+                        <label className="form-label">Language Medium</label>
+                        <input type="text" className="form-control" required value={medium} onChange={e => setMedium(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="form-label">Allowed Attempts per Student</label>
+                        <input type="number" className="form-control" required min="1" max="20" value={freeAttemptLimit} onChange={e => setFreeAttemptLimit(e.target.value)} />
+                    </div>
+                </div>
+
                 <div className="form-group">
-                    <label className="form-label">Language Medium</label>
-                    <input type="text" className="form-control" required value={medium} onChange={e => setMedium(e.target.value)} />
+                    <label className="form-label">Question Pool (Exam Board)</label>
+                    <select className="form-control" value={questionBatch} onChange={e => setQuestionBatch(e.target.value)}>
+                        {EXAM_BATCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                        Which board's question bank this free test previews from.
+                    </p>
                 </div>
 
                 <div className="form-group form-grid-3col">
                     <div>
                         <label className="form-label">Duration (Minutes)</label>
-                        <input type="number" className="form-control" required min="10" max="300" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} />
+                        <input type="number" className="form-control" required min="5" max="300" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} />
                     </div>
                     <div>
                         <label className="form-label">Negative Marking Rate</label>
@@ -240,12 +265,11 @@ export const ExamConfigList = ({ onRefresh }) => {
                     </div>
                 </div>
 
-                {/* Subject-wise Question Selection Panel */}
                 <div className="form-group" style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                         <div>
                             <h4 style={{ fontSize: '0.95rem', fontWeight: 800 }}>Subject-wise Question Breakdown</h4>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Specify exact question count per subject module.</p>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Keep this short — a free test is a preview, not a full mock.</p>
                         </div>
                         <button type="button" className="btn btn-secondary btn-sm" onClick={handleAddSubject}>
                             + Add Subject Module
@@ -263,9 +287,9 @@ export const ExamConfigList = ({ onRefresh }) => {
                         <div key={idx} className="subject-row-grid">
                             <input
                                 type="text"
-                                className="form-control" 
-                                required 
-                                value={sb.name} 
+                                className="form-control"
+                                required
+                                value={sb.name}
                                 onChange={e => handleSubjectChange(idx, 'name', e.target.value)}
                                 placeholder="Subject Name (e.g. Mathematics)"
                             />
@@ -274,7 +298,7 @@ export const ExamConfigList = ({ onRefresh }) => {
                                 className="form-control"
                                 required
                                 min="1"
-                                max="200"
+                                max="50"
                                 value={sb.questionsCount}
                                 onChange={e => handleSubjectChange(idx, 'questionsCount', e.target.value)}
                                 placeholder="Qs Count"
@@ -292,8 +316,8 @@ export const ExamConfigList = ({ onRefresh }) => {
                                 title="Marks per Question"
                             />
                             <button
-                                type="button" 
-                                className="btn btn-danger btn-sm" 
+                                type="button"
+                                className="btn btn-danger btn-sm"
                                 onClick={() => handleRemoveSubject(idx)}
                                 disabled={subjectBreakdown.length <= 1}
                                 style={{ padding: '0.4rem', justifyContent: 'center' }}

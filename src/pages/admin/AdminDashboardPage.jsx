@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StudentTable } from '../../components/admin/StudentTable.jsx';
 import { QuestionBankManager } from '../../components/admin/QuestionBankManager.jsx';
 import { ExamConfigList } from '../../components/admin/ExamConfigList.jsx';
+import { FreeTestManager } from '../../components/admin/FreeTestManager.jsx';
 import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { ExamPaperGenerator } from '../../components/admin/ExamPaperGenerator.jsx';
@@ -78,11 +79,17 @@ export const AdminDashboardPage = () => {
                 >
                     {t('tab_questions')}
                 </button>
-                <button 
+                <button
                     className={`btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('exams')}
                 >
                     {t('tab_exams')}
+                </button>
+                <button
+                    className={`btn ${activeTab === 'free_tests' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('free_tests')}
+                >
+                    {t('tab_free_tests')}
                 </button>
                 <button
                     className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}
@@ -164,6 +171,7 @@ export const AdminDashboardPage = () => {
             {activeTab === 'packages' && <PackageManager onRefresh={loadStats} />}
             {activeTab === 'questions' && <QuestionBankManager onRefresh={loadStats} />}
             {activeTab === 'exams' && <ExamConfigList />}
+            {activeTab === 'free_tests' && <FreeTestManager onRefresh={loadStats} />}
             {activeTab === 'reports' && <SystemReportsPage />}
             {activeTab === 'exam_paper' && <ExamPaperGenerator />}
         </div>

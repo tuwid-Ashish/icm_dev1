@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useExam } from '../../context/ExamContext.jsx';
@@ -7,6 +8,7 @@ import { Modal } from '../../components/common/Modal.jsx';
 import { getExamAccess } from '../../utils/examAccess.js';
 
 export const ExamCatalogPage = () => {
+    const router = useRouter();
     const { user } = useAuth();
     const { startPracticeTest } = useExam();
     const { t } = useLanguage();
@@ -25,7 +27,9 @@ export const ExamCatalogPage = () => {
             setLoading(true);
             const loaded = await firestoreEngine.getExams();
             if (isMounted) {
-                setExams(loaded);
+                // Free tests have their own dedicated page (Free Tests) —
+                // they don't belong in the general exam catalog.
+                setExams(loaded.filter(e => !e.isFreeTest));
                 setLoading(false);
             }
         }
@@ -105,14 +109,24 @@ export const ExamCatalogPage = () => {
                                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>{e.description}</p>
                                     </div>
 
-                                    <button 
-                                        className={`btn ${!isAccessible ? 'btn-secondary' : 'btn-primary'} btn-lg`}
-                                        style={{ minWidth: '220px' }}
-                                        disabled={!isAccessible}
-                                        onClick={() => handleOpenModal(e)}
-                                    >
-                                        {!isAccessible ? (access.reason === 'quota_exhausted' ? t('quota_exhausted_btn') : t('package_purchase_required_btn')) : t('configure_launch_paper')}
-                                    </button>
+                                    {!isAccessible && access.reason === 'no_package' ? (
+                                        <button
+                                            className="btn btn-primary btn-lg"
+                                            style={{ minWidth: '220px' }}
+                                            onClick={() => router.push('/dashboard/packages')}
+                                        >
+                                            Buy Package
+                                        </button>
+                                    ) : (
+                                        <button
+                                            className={`btn ${!isAccessible ? 'btn-secondary' : 'btn-primary'} btn-lg`}
+                                            style={{ minWidth: '220px' }}
+                                            disabled={!isAccessible}
+                                            onClick={() => handleOpenModal(e)}
+                                        >
+                                            {!isAccessible ? t('quota_exhausted_btn') : t('configure_launch_paper')}
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Examination Key Metrics Grid */}
