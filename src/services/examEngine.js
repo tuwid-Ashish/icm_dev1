@@ -6,6 +6,7 @@
 import { firestoreEngine } from './firestoreEngine.js';
 import { storageService } from './storageService.js';
 import { getExamAccess } from '../utils/examAccess.js';
+import { EXAM_ID_TO_BATCH } from '../constants/examBatches.js';
 
 class ExamEngine {
     /**
@@ -43,29 +44,34 @@ class ExamEngine {
         }
 
         const allQuestions = await firestoreEngine.getQuestions();
-        const examNameLower = (exam.name || '').toLowerCase();
-        const examIdLower = (exam.id || '').toLowerCase();
 
-        // 1. Filter Questions for the target Exam Batch
-        let batchQuestions = allQuestions.filter(q => {
-            if (Array.isArray(q.batches)) {
-                if (q.batches.includes('ALL') || q.batches.includes('All Batches')) return true;
-                if (q.batches.some(b => {
-                    const bl = String(b).toLowerCase();
-                    return examNameLower.includes(bl) || bl.includes(examIdLower);
-                })) return true;
-            }
-            if (q.batch) {
-                const bStr = String(q.batch).toLowerCase();
-                if (bStr.includes('all')) return true;
-                if (examNameLower.includes('police') && bStr.includes('police')) return true;
-                if ((examNameLower.includes('vanrakshak') || examNameLower.includes('forest')) && (bStr.includes('vanrakshak') || bStr.includes('forest'))) return true;
-                if (examNameLower.includes('ssc') && bStr.includes('ssc')) return true;
-                if (bStr.includes(examIdLower)) return true;
-            }
-            return true;
-        });
+        // 1. Filter Questions for the target Exam Batch — matched via an
+        // explicit exam-id -> batch-tag mapping (EXAM_ID_TO_BATCH), not by
+        // fuzzy-matching the exam's display name against the batch tag.
+        // The old name-based matching never actually matched (Marathi exam
+        // names don't contain the ASCII "police"/"ssc"/"vanrakshak" substrings
+        // it checked for, and "police bharti" vs "police_bharti" never lined
+        // up either), so every exam silently fell through to drawing from the
+        // entire question bank across all boards instead of its own.
+        const targetBatch = EXAM_ID_TO_BATCH[exam.id];
+        let batchQuestions = targetBatch
+            ? allQuestions.filter(q => {
+                if (Array.isArray(q.batches)) {
+                    if (q.batches.includes('ALL') || q.batches.includes('All Batches')) return true;
+                    return q.batches.includes(targetBatch);
+                }
+                if (q.batch) {
+                    const parts = String(q.batch).split(',').map(b => b.trim());
+                    if (parts.some(p => p.toLowerCase() === 'all')) return true;
+                    return parts.includes(targetBatch);
+                }
+                return false;
+            })
+            : allQuestions;
 
+        // Defensive fallback for an exam with no mapping entry (e.g. a new
+        // blueprint the admin just created) — degrade to the full pool
+        // rather than generating an empty paper.
         if (batchQuestions.length === 0) {
             batchQuestions = allQuestions;
         }

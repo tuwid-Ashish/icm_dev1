@@ -224,10 +224,15 @@ export const ExamProvider = ({ children }) => {
         await firestoreEngine.saveSubmission(evaluated);
 
         // Only a successfully submitted, non-free test consumes a quota slot.
+        // A free test instead records a one-time "used" flag on submit — free
+        // tests have no quota to draw down, so this is what stops a student
+        // retaking the same free exam over and over.
         if (!sessionToSubmit.isFreeTest) {
             await firestoreEngine.decrementStudentQuota(sessionToSubmit.studentId);
-            refreshUser();
+        } else {
+            await firestoreEngine.markFreeTestUsed(sessionToSubmit.studentId, sessionToSubmit.examId);
         }
+        refreshUser();
 
         // Clear active session
         updateActiveSession(null);

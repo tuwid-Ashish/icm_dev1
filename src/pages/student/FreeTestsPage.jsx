@@ -5,12 +5,14 @@ import { useLanguage } from '../../context/LanguageContext.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../../components/common/Modal.jsx';
 import { DashboardShell } from '../../layouts/DashboardShell.jsx';
+import { getExamAccess } from '../../utils/examAccess.js';
 
 export const FreeTestsPage = () => {
     const { user } = useAuth();
     const { startPracticeTest } = useExam();
     const { t } = useLanguage();
     const [exams, setExams] = useState([]);
+    const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
 
     const [selectedExam, setSelectedExam] = useState(null);
@@ -21,13 +23,19 @@ export const FreeTestsPage = () => {
     useEffect(() => {
         (async () => {
             setLoading(true);
+            const uid = user ? (user.id || user.uid) : null;
+            if (uid) {
+                const profile = await firestoreEngine.getUserProfile(uid);
+                setUserProfile(profile);
+            }
             const loaded = await firestoreEngine.getExams();
             setExams(loaded.filter(e => e.isFreeTest));
             setLoading(false);
         })();
-    }, []);
+    }, [user]);
 
     const handleOpenModal = (exam) => {
+        if (!getExamAccess(userProfile, exam).unlocked) return;
         setSelectedExam(exam);
         setTestMode('full');
         setSelectedSubject('ALL');
@@ -63,34 +71,51 @@ export const FreeTestsPage = () => {
                     <div className="card"><p style={{ color: 'var(--text-muted)' }}>No free tests are available right now.</p></div>
                 ) : (
                     <div className="cards-equal-grid">
-                        {exams.map(e => (
-                            <div key={e.id} className="exam-select-card" onClick={() => handleOpenModal(e)}>
-                                <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                        <div className="exam-card-medium">{e.medium}</div>
-                                        <span className="badge badge-success">{t('free_test_badge')}</span>
+                        {exams.map(e => {
+                            const access = getExamAccess(userProfile, e);
+                            const alreadyUsed = access.reason === 'free_test_used';
+                            return (
+                                <div
+                                    key={e.id}
+                                    className="exam-select-card"
+                                    style={alreadyUsed ? { opacity: 0.7, cursor: 'default' } : undefined}
+                                    onClick={() => handleOpenModal(e)}
+                                >
+                                    <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                            <div className="exam-card-medium">{e.medium}</div>
+                                            <span className={`badge ${alreadyUsed ? 'badge-warning' : 'badge-success'}`}>
+                                                {alreadyUsed ? 'ALREADY ATTEMPTED' : t('free_test_badge')}
+                                            </span>
+                                        </div>
+
+                                        <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                                            {e.name}
+                                        </h4>
+                                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+                                            {e.description || 'Full length online CBT practice test series.'}
+                                        </p>
+
+                                        <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: !alreadyUsed ? '1.5rem' : '0.5rem' }}>
+                                            <div>Duration: <strong>{e.durationMinutes} Mins</strong></div>
+                                            <div>Questions: <strong>{e.totalQuestions} Qs</strong></div>
+                                            <div>Total Marks: <strong>{e.totalMarks} M</strong></div>
+                                            <div>Negative Rate: <strong>{e.negativeMarkingRate}</strong></div>
+                                        </div>
+
+                                        {alreadyUsed && (
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: 600 }}>
+                                                You've already used your one free attempt for this test.
+                                            </p>
+                                        )}
                                     </div>
 
-                                    <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
-                                        {e.name}
-                                    </h4>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-                                        {e.description || 'Full length online CBT practice test series.'}
-                                    </p>
-
-                                    <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.6rem', marginBottom: '1.5rem' }}>
-                                        <div>Duration: <strong>{e.durationMinutes} Mins</strong></div>
-                                        <div>Questions: <strong>{e.totalQuestions} Qs</strong></div>
-                                        <div>Total Marks: <strong>{e.totalMarks} M</strong></div>
-                                        <div>Negative Rate: <strong>{e.negativeMarkingRate}</strong></div>
-                                    </div>
+                                    <button className="btn btn-primary" style={{ width: '100%', fontWeight: 700 }} disabled={alreadyUsed}>
+                                        {alreadyUsed ? 'Attempt Used' : t('launch_free_test')}
+                                    </button>
                                 </div>
-
-                                <button className="btn btn-primary" style={{ width: '100%', fontWeight: 700 }}>
-                                    {t('launch_free_test')}
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

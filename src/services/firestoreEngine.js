@@ -276,6 +276,33 @@ export const firestoreEngine = {
         }
     },
 
+    // 8b. Record a completed free-test attempt so it can't be retaken —
+    // free tests have no quota, so this is the only thing enforcing
+    // "once per student" instead of unlimited free retries.
+    markFreeTestUsed: async (uid, examId) => {
+        const profile = await firestoreEngine.getUserProfile(uid);
+        if (!profile) return;
+
+        const usedFreeTests = Array.isArray(profile.usedFreeTests) ? profile.usedFreeTests : [];
+        if (usedFreeTests.includes(examId)) return;
+        const nextUsed = [...usedFreeTests, examId];
+
+        if (isFirebaseConnected && db) {
+            try {
+                const userRef = doc(db, 'users', uid);
+                await updateDoc(userRef, {
+                    usedFreeTests: nextUsed,
+                    updatedAt: new Date().toISOString()
+                });
+
+                const updatedProfile = { ...profile, usedFreeTests: nextUsed };
+                storageService.setCurrentUser(updatedProfile);
+            } catch (e) {
+                console.error('[Firestore Engine] Free test usage record error:', e.message);
+            }
+        }
+    },
+
     // 9. Save Test Attempt (Source of Truth: Firestore 'test_attempts' collection)
     saveSubmission: async (attemptData) => {
         if (isFirebaseConnected && db) {

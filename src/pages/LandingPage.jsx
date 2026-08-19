@@ -115,14 +115,14 @@ export const LandingPage = ({ onNavigate }) => {
                                 <h3 className="exam-card-title">{e.name}</h3>
                                 <p className="exam-card-desc">{e.description}</p>
 
-                                <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                                {/* <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1.25rem' }}>
                                     <div>{t('duration_label')}: <strong>{e.durationMinutes} {t('mins_unit')}</strong></div>
                                     <div>{t('total_questions_label')}: <strong>{e.totalQuestions}</strong></div>
                                     <div>{t('total_marks_label')}: <strong>{e.totalMarks}</strong></div>
                                     <div>{t('negative_rate_label')}: <strong>{e.negativeMarkingRate}</strong></div>
-                                </div>
+                                </div> */}
 
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                                {/* <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
                                     {t('subject_split_label')}
                                 </div>
                                 <ul style={{ listStyle: 'none', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
@@ -132,7 +132,7 @@ export const LandingPage = ({ onNavigate }) => {
                                             <strong style={{ color: 'var(--text-primary)' }}>{s.questionsCount} {t('qs_unit')} ({(s.questionsCount || 0) * (s.marksPerQuestion || 1)} {t('marks_unit')})</strong>
                                         </li>
                                     ))}
-                                </ul>
+                                </ul> */}
                             </div>
 
                             <button className="btn btn-primary" style={{ width: '100%', fontWeight: 700 }}>
