@@ -55,6 +55,13 @@ export const DashboardHubPage = () => {
                         onClick={() => router.push('/dashboard/exams')}
                     />
                     <NavActionCard
+                            icon="🆓"
+                            color="#16a34a"
+                            title={t('nav_free_tests')}
+                            description={t('nav_free_tests_desc')}
+                            onClick={() => router.push('/dashboard/free-tests')}
+                        />
+                    <NavActionCard
                         icon="📄"
                         color="#4338ca"
                         title={t('nav_active_package')}
@@ -74,13 +81,6 @@ export const DashboardHubPage = () => {
                         title={t('nav_new_package')}
                         description={t('nav_new_package_desc')}
                         onClick={() => router.push('/dashboard/packages')}
-                    />
-                    <NavActionCard
-                        icon="🆓"
-                        color="#16a34a"
-                        title={t('nav_free_tests')}
-                        description={t('nav_free_tests_desc')}
-                        onClick={() => router.push('/dashboard/free-tests')}
                     />
                 </div>
             </div>
