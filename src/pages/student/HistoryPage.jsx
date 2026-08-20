@@ -100,7 +100,7 @@ export const HistoryPage = ({ onViewResult }) => {
                 </div>
             </div>
 
-            {/* Historical Attempt Log Table */}
+            {/* Exam Attempt Log Table */}
             <div className="card">
                 <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                     <div>

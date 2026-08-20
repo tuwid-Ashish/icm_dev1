@@ -651,7 +651,7 @@ export const firestoreEngine = {
     // 15. Admin Merchant Payment Settings (Source of Truth: Firestore 'settings/payment' document)
     getMerchantPaymentSettings: async () => {
         const envKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
-        const DEFAULT_KEY = 'rzp_test_E66NI3Yg44x1mj';
+        // const DEFAULT_KEY = 'rzp_test_E66NI3Yg44x1mj';
 
         const resolveKey = (adminSavedKey) => {
             if (adminSavedKey && adminSavedKey.trim() && adminSavedKey.trim() !== 'rzp_test_sigmaforce2026') {
@@ -660,7 +660,7 @@ export const firestoreEngine = {
             if (envKey && envKey.trim() && envKey.trim() !== 'rzp_test_sigmaforce2026') {
                 return envKey.trim();
             }
-            return DEFAULT_KEY;
+            return envKey.trim();
         };
 
         if (isFirebaseConnected && db) {

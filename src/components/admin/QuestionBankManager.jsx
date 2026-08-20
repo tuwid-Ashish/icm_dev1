@@ -16,6 +16,26 @@ export const QuestionBankManager = ({ onRefresh }) => {
     const [bulkModalOpen, setBulkModalOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingQ, setEditingQ] = useState(null);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deletingQ, setDeletingQ] = useState(null);
+
+    const handleOpenDeleteModal = (q) => {
+        setDeletingQ(q);
+        setDeleteModalOpen(true);
+    };
+
+    const handleConfirmDeleteQuestion = async () => {
+        if (!deletingQ) return;
+        try {
+            await firestoreEngine.deleteQuestion(deletingQ.id);
+            setDeleteModalOpen(false);
+            setDeletingQ(null);
+            await loadQuestions();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            alert('Error deleting question: ' + err.message);
+        }
+    };
 
     // Multi-select batch choices
     const availableBatches = ['Police Bharti', 'Vanrakshak', 'SSC GD'];
@@ -245,8 +265,11 @@ export const QuestionBankManager = ({ onRefresh }) => {
                                         <MathRenderer text={q.explanation} />
                                     </td>
                                     <td style={{ whiteSpace: 'nowrap' }}>
-                                        <button className="btn btn-secondary btn-sm" onClick={() => handleOpenEditModal(q)}>
+                                        <button className="btn btn-secondary btn-sm" style={{ marginRight: '0.35rem' }} onClick={() => handleOpenEditModal(q)}>
                                             Edit
+                                        </button>
+                                        <button className="btn btn-danger btn-sm" onClick={() => handleOpenDeleteModal(q)}>
+                                            Delete
                                         </button>
                                     </td>
                                 </tr>
@@ -476,6 +499,35 @@ export const QuestionBankManager = ({ onRefresh }) => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Delete Confirmation Warning Modal */}
+            <Modal
+                isOpen={deleteModalOpen}
+                onClose={() => { setDeleteModalOpen(false); setDeletingQ(null); }}
+                title="⚠️ Delete Question Confirmation"
+                maxWidth="500px"
+                footer={
+                    <>
+                        <button type="button" className="btn btn-secondary" onClick={() => { setDeleteModalOpen(false); setDeletingQ(null); }}>Cancel</button>
+                        <button type="button" className="btn btn-danger" onClick={handleConfirmDeleteQuestion}>Confirm & Delete Question</button>
+                    </>
+                }
+            >
+                <div style={{ padding: '0.5rem 0' }}>
+                    <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: '1rem', lineHeight: 1.5 }}>
+                        Are you sure you want to delete question <code>{deletingQ?.id}</code> from Cloud Firestore?
+                    </p>
+                    {deletingQ && (
+                        <div style={{ background: 'var(--bg-subtle)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Question Content:</div>
+                            <MathRenderer text={deletingQ.text} imageUrl={deletingQ.imageUrl || (deletingQ.questionImages && deletingQ.questionImages[0]?.url)} />
+                        </div>
+                    )}
+                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--danger)', fontWeight: 600 }}>
+                        ⚠️ <strong>Warning:</strong> This action is permanent and cannot be undone. The question will be permanently removed from Cloud Firestore.
                     </div>
                 </div>
             </Modal>

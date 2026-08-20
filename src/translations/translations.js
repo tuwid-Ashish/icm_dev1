@@ -95,7 +95,7 @@ export const translations = {
         failed_badge: "FAILED",
 
         // Exam Catalog Page
-        catalog_page_title: "Exam Catalog & Official Syllabus Explorer",
+        catalog_page_title: "Exam Catalog & Official Syllabus",
         catalog_page_desc: "Explore detailed subject weightages, official topic coverage, and qualifying cutoff criteria.",
         configure_launch_paper: "start Paper",
         quota_exhausted_btn: "Quota Exhausted (Purchase Package)",
@@ -118,8 +118,8 @@ export const translations = {
         cancel_btn: "Cancel",
 
         // Test History & Performance Analytics Page
-        history_page_title: "Historical Audit & Performance Analytics",
-        history_page_desc: "In-depth historical test attempt logs, score trend analytics, and subject weakness detection.",
+        history_page_title: "Exam Attempt History & Performance Analytics",
+        history_page_desc: "In-depth exam attempt history logs, score trend analytics, and subject weakness detection.",
         weakness_detector_title: "Subject Accuracy & Weakness Detector",
         weakness_detector_desc: "Aggregated accuracy rates across all completed practice tests.",
         correct_of_attempted: "Correct of",
@@ -344,7 +344,7 @@ export const translations = {
         failed_badge: "अपात्र (Failed)",
 
         // Exam Catalog Page
-        catalog_page_title: "परीक्षा कॅटलॉग आणि अधिकृत अभ्यासक्रम एक्सप्लोरर",
+        catalog_page_title: "परीक्षा कॅटलॉग आणि अधिकृत अभ्यासक्रम",
         catalog_page_desc: "विषयनिहाय गुणभारांश, अधिकृत अभ्यासक्रम आणि पात्रता कटऑफची सविस्तर माहिती पाहा.",
         configure_launch_paper: "पेपर सुरू करा",
         quota_exhausted_btn: "कोटा संपला (पॅकेज खरेदी करा)",
@@ -367,8 +367,8 @@ export const translations = {
         cancel_btn: "रद्द करा",
 
         // Test History & Performance Analytics Page
-        history_page_title: "इतिहास ऑडिट आणि अचूकता विश्लेषण",
-        history_page_desc: "सखोल ऐतिहासिक सराव चाचणी लॉग, गुण ट्रेंड आणि विषयनिहाय अचूकता विश्लेषण.",
+        history_page_title: "परीक्षा प्रयत्न इतिहास आणि विश्लेषण",
+        history_page_desc: "सखोल परीक्षा प्रयत्न इतिहास लॉग, गुण ट्रेंड आणि विषयनिहाय अचूकता विश्लेषण.",
         weakness_detector_title: "विषयनिहाय अचूकता आणि कमकुवतपणा शोधक",
         weakness_detector_desc: "सर्व पूर्ण झालेल्या सराव चाचण्यांमधील एकत्रित अचूकता दर.",
         correct_of_attempted: "प्रयत्न केलेल्या पैकी बरोबर:",

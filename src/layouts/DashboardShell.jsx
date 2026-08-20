@@ -5,6 +5,7 @@ import { useExam } from '../context/ExamContext.jsx';
 import { Navbar } from '../components/common/Navbar.jsx';
 import { TestSimulatorPage } from '../pages/student/TestSimulatorPage.jsx';
 import { TestResultPage } from '../pages/student/TestResultPage.jsx';
+import { WhatsAppFloatButton } from '../components/common/WhatsAppFloatButton.jsx';
 
 // Shared shell for every real /dashboard/* route: auth guard (student-only),
 // the shared Navbar wired to router.push instead of internal state, and the
@@ -71,6 +72,9 @@ export const DashboardShell = ({ children }) => {
                     </div>
                 )}
             </main>
+
+            {/* Floating WhatsApp Chat Support Widget */}
+            {ready && !activeSession && <WhatsAppFloatButton />}
         </div>
     );
 };
