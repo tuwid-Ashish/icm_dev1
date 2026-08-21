@@ -28,7 +28,7 @@ export const WhatsAppFloatButton = () => {
 
     // Default support WhatsApp number or extracted merchant number
     const phoneNumber ='919850845094';
-    const whatsappUrl = `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent('Hello SigmaForce CEP Support, I need assistance with my account/tests.')}`;
+    const whatsappUrl = `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent('Hello Sigma vardi Support, I need assistance with my account/tests.')}`;
 
     return (
         <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
