@@ -12,6 +12,9 @@ class ExamEngine {
     /**
      * Fisher-Yates (Knuth) Shuffle algorithm for 100% unbiased, robust random question selection.
      */
+    /**
+     * Fisher-Yates (Knuth) Shuffle algorithm for 100% unbiased, robust random question selection.
+     */
     fisherYatesShuffle(array) {
         const shuffled = [...array];
         for (let i = shuffled.length - 1; i > 0; i--) {
@@ -21,6 +24,40 @@ class ExamEngine {
         return shuffled;
     }
 
+    /**
+     * Matches a question against a blueprint subject using code, name, or canonical aliases.
+     */
+    isQuestionMatchingSubject(q, bpSubjectName) {
+        if (!q || !bpSubjectName) return false;
+        const qSub = (q.subject || '').toLowerCase();
+        const qCode = (q.subjectCode || '').toUpperCase();
+        const bpSub = String(bpSubjectName || '').toLowerCase();
+
+        if (qSub === bpSub || qSub.includes(bpSub) || bpSub.includes(qSub)) return true;
+
+        const isMathBP = bpSub.includes('math') || bpSub.includes('अंकगणित') || bpSub.includes('गणित');
+        const isMathQ = qSub.includes('math') || qSub.includes('अंकगणित') || qSub.includes('गणित') || qCode === 'M1';
+        if (isMathBP && isMathQ) return true;
+
+        const isReasoningBP = bpSub.includes('reasoning') || bpSub.includes('intel') || bpSub.includes('बुद्धिमत्ता');
+        const isReasoningQ = qSub.includes('reasoning') || qSub.includes('intel') || qSub.includes('बुद्धिमत्ता') || qCode === 'M2';
+        if (isReasoningBP && isReasoningQ) return true;
+
+        const isGkBP = bpSub.includes('gk') || bpSub.includes('general') || bpSub.includes('सामान्य');
+        const isGkQ = qSub.includes('gk') || qSub.includes('general') || qSub.includes('सामान्य') || qCode === 'M3';
+        if (isGkBP && isGkQ) return true;
+
+        const isMarathiBP = bpSub.includes('marathi') || bpSub.includes('मराठी');
+        const isMarathiQ = (qSub.includes('marathi') || qSub.includes('मराठी')) && !qSub.includes('english') && qCode === 'M4';
+        if (isMarathiBP && isMarathiQ) return true;
+
+        const isEnglishBP = bpSub.includes('english') || bpSub.includes('इंग्रजी');
+        const isEnglishQ = qSub.includes('english') || qSub.includes('इंग्रजी') || qCode === 'M5';
+        if (isEnglishBP && isEnglishQ) return true;
+
+        return false;
+    }
+
     async generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20, studentInfo = {}) {
         const exams = await firestoreEngine.getExams();
         const exam = exams.find(e => e.id === examId);
@@ -28,11 +65,7 @@ class ExamEngine {
             return { error: 'Invalid exam selected.' };
         }
 
-        // Engine-side Paywall & Quota Verification — this is the actual gate
-        // before a paper is generated, not just a UI display check, so it
-        // has to be exam-scoped: a purchase for one exam must not let a
-        // student start a *different* paid exam just because remainingTests
-        // (a pooled counter) happens to be > 0.
+        // Engine-side Paywall & Quota Verification
         const currentUser = await firestoreEngine.getUserProfile(studentId) || storageService.getCurrentUser();
         const access = getExamAccess(currentUser, exam);
 
@@ -45,17 +78,7 @@ class ExamEngine {
 
         const allQuestions = await firestoreEngine.getQuestions();
 
-        // 1. Filter Questions for the target Exam Batch — matched via an
-        // explicit batch tag, not by fuzzy-matching the exam's display name
-        // against it. The old name-based matching never actually matched
-        // (Marathi exam names don't contain the ASCII "police"/"ssc"/
-        // "vanrakshak" substrings it checked for, and "police bharti" vs
-        // "police_bharti" never lined up either), so every exam silently
-        // fell through to drawing from the entire question bank across all
-        // boards instead of its own.
-        // Admin-created free tests set exam.questionBatch directly (picked
-        // from a dropdown); the 3 fixed paid exams fall back to the static
-        // EXAM_ID_TO_BATCH mapping.
+        // 1. Filter Questions for the target Exam Batch
         const targetBatch = exam.questionBatch || EXAM_ID_TO_BATCH[exam.id];
         let batchQuestions = targetBatch
             ? allQuestions.filter(q => {
@@ -72,53 +95,64 @@ class ExamEngine {
             })
             : allQuestions;
 
-        // Defensive fallback for an exam with no mapping entry (e.g. a new
-        // blueprint the admin just created) — degrade to the full pool
-        // rather than generating an empty paper.
         if (batchQuestions.length === 0) {
             batchQuestions = allQuestions;
         }
 
-        // 2. Filter Questions for the target Subject if specified (e.g. Mathematics)
-        if (subjectFilter && subjectFilter !== 'ALL') {
-            const sfLower = subjectFilter.toLowerCase();
-            const matched = batchQuestions.filter(q => {
-                const qSub = (q.subject || '').toLowerCase();
-                if (qSub === sfLower || qSub.includes(sfLower) || sfLower.includes(qSub)) return true;
+        let generatedQuestions = [];
 
-                const isMathFilter = sfLower.includes('math') || sfLower.includes('अंकगणित') || sfLower.includes('गणित');
-                const isMathQ = qSub.includes('math') || qSub.includes('अंकगणित') || qSub.includes('गणित');
-                if (isMathFilter && isMathQ) return true;
+        // 🌟 2. Blueprint-Driven Subject Selection Engine
+        // Strictly obeys the Exam Blueprint configuration configured in the Admin Section (exam.subjects).
+        // Filters out any unassigned or non-blueprint subjects (e.g. English is excluded for Police Bharti).
+        const blueprintSubjects = exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0
+            ? exam.subjects
+            : null;
 
-                const isReasoningFilter = sfLower.includes('reasoning') || sfLower.includes('intel') || sfLower.includes('बुद्धिमत्ता');
-                const isReasoningQ = qSub.includes('reasoning') || qSub.includes('intel') || qSub.includes('बुद्धिमत्ता');
-                if (isReasoningFilter && isReasoningQ) return true;
+        if (subjectFilter === 'ALL' && blueprintSubjects) {
+            const totalBlueprintQuestions = blueprintSubjects.reduce((sum, s) => sum + (parseInt(s.questionsCount, 10) || 0), 0);
+            const targetTotalCount = Math.min(exam.totalQuestions || totalBlueprintQuestions || 20, 100);
+            const scaleRatio = totalBlueprintQuestions > 0 ? (targetTotalCount / totalBlueprintQuestions) : 1;
 
-                const isGkFilter = sfLower.includes('gk') || sfLower.includes('general') || sfLower.includes('सामान्य');
-                const isGkQ = qSub.includes('gk') || qSub.includes('general') || qSub.includes('सामान्य');
-                if (isGkFilter && isGkQ) return true;
+            blueprintSubjects.forEach(s => {
+                const wantedCount = Math.max(1, Math.round((parseInt(s.questionsCount, 10) || 1) * scaleRatio));
+                const subjPool = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, s.name));
+                const shuffledSubjPool = this.fisherYatesShuffle(subjPool);
 
-                const isLangFilter = sfLower.includes('marathi') || sfLower.includes('english') || sfLower.includes('मराठी');
-                const isLangQ = qSub.includes('marathi') || qSub.includes('english') || qSub.includes('मराठी');
-                if (isLangFilter && isLangQ) return true;
+                const picked = shuffledSubjPool.slice(0, Math.min(wantedCount, shuffledSubjPool.length)).map(q => ({
+                    ...q,
+                    sectionId: s.id || s.name,
+                    sectionName: s.name,
+                    marks: s.marksPerQuestion || q.marks || 1
+                }));
 
-                return false;
+                generatedQuestions.push(...picked);
             });
-            batchQuestions = matched;
+        } else if (subjectFilter !== 'ALL') {
+            const sfLower = subjectFilter.toLowerCase();
+            const matched = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, sfLower));
+            const shuffled = this.fisherYatesShuffle(matched);
+            const selectedCount = Math.min(parseInt(count, 10) || 20, shuffled.length);
+            generatedQuestions = shuffled.slice(0, selectedCount);
+        } else {
+            const shuffled = this.fisherYatesShuffle(batchQuestions);
+            const selectedCount = Math.min(exam.totalQuestions || 20, shuffled.length);
+            generatedQuestions = shuffled.slice(0, selectedCount);
         }
 
-        if (batchQuestions.length === 0) {
-            return { error: `No question paper items found for selected subject "${subjectFilter}". Please select All Subjects or add questions in Question Bank.` };
+        if (generatedQuestions.length === 0) {
+            return { error: `No question paper items found for selected subject or exam blueprint. Please check Question Bank.` };
         }
 
-        // Perform Fisher-Yates True Randomization
-        const randomizedPool = this.fisherYatesShuffle(batchQuestions);
-        const selectedCount = Math.min(subjectFilter !== 'ALL' ? parseInt(count, 10) : (exam.totalQuestions || 20), randomizedPool.length);
-
-        const generatedQuestions = [];
-        for (let i = 0; i < selectedCount; i++) {
-            generatedQuestions.push(randomizedPool[i]);
-        }
+        // Deduplicate and ensure no duplicate question IDs
+        const uniqueQuestions = [];
+        const seenIds = new Set();
+        generatedQuestions.forEach(q => {
+            if (!seenIds.has(q.id)) {
+                seenIds.add(q.id);
+                uniqueQuestions.push(q);
+            }
+        });
+        generatedQuestions = uniqueQuestions;
 
         const paletteStates = {};
         generatedQuestions.forEach(q => {

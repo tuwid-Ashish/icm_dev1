@@ -56,24 +56,47 @@ export class ExamEngine {
             return arr;
         };
 
-        // Select questions per subject section
+        const isQuestionMatchingSubject = (q, bpSubjectName) => {
+            if (!q || !bpSubjectName) return false;
+            const qSub = (q.subject || '').toLowerCase();
+            const qCode = (q.subjectCode || '').toUpperCase();
+            const bpSub = String(bpSubjectName || '').toLowerCase();
+
+            if (qSub === bpSub || qSub.includes(bpSub) || bpSub.includes(qSub)) return true;
+
+            const isMathBP = bpSub.includes('math') || bpSub.includes('अंकगणित') || bpSub.includes('गणित');
+            const isMathQ = qSub.includes('math') || qSub.includes('अंकगणित') || qSub.includes('गणित') || qCode === 'M1';
+            if (isMathBP && isMathQ) return true;
+
+            const isReasoningBP = bpSub.includes('reasoning') || bpSub.includes('intel') || bpSub.includes('बुद्धिमत्ता');
+            const isReasoningQ = qSub.includes('reasoning') || qSub.includes('intel') || qSub.includes('बुद्धिमत्ता') || qCode === 'M2';
+            if (isReasoningBP && isReasoningQ) return true;
+
+            const isGkBP = bpSub.includes('gk') || bpSub.includes('general') || bpSub.includes('सामान्य');
+            const isGkQ = qSub.includes('gk') || qSub.includes('general') || qSub.includes('सामान्य') || qCode === 'M3';
+            if (isGkBP && isGkQ) return true;
+
+            const isMarathiBP = bpSub.includes('marathi') || bpSub.includes('मराठी');
+            const isMarathiQ = (qSub.includes('marathi') || qSub.includes('मराठी')) && !qSub.includes('english') && qCode === 'M4';
+            if (isMarathiBP && isMarathiQ) return true;
+
+            const isEnglishBP = bpSub.includes('english') || bpSub.includes('इंग्रजी');
+            const isEnglishQ = qSub.includes('english') || qSub.includes('इंग्रजी') || qCode === 'M5';
+            if (isEnglishBP && isEnglishQ) return true;
+
+            return false;
+        };
+
+        // Select questions strictly per blueprint subject section
         exam.subjects.forEach(subject => {
-            let subjectPool = batchQuestions.filter(q => 
-                q.subject.toLowerCase().includes(subject.name.toLowerCase()) ||
-                subject.name.toLowerCase().includes(q.subject.toLowerCase())
-            );
-
-            if (subjectPool.length === 0) {
-                subjectPool = batchQuestions;
-            }
-
+            const subjectPool = batchQuestions.filter(q => isQuestionMatchingSubject(q, subject.name));
             const shuffledPool = shuffle(subjectPool);
             
             // Scaled selection if full quota exceeds available pool
             const countToPick = Math.min(subject.questionsCount, shuffledPool.length);
             const picked = shuffledPool.slice(0, countToPick).map(q => ({
                 ...q,
-                sectionId: subject.id,
+                sectionId: subject.id || subject.name,
                 sectionName: subject.name,
                 marks: subject.marksPerQuestion || q.marks || 1
             }));
