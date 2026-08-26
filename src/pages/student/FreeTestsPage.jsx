@@ -167,7 +167,7 @@ export const FreeTestsPage = () => {
                             >
                                 <option value="ALL">{t('all_subjects_mixed')}</option>
                                 {selectedExam.subjects && selectedExam.subjects.map(s => (
-                                    <option key={s.id || s.name} value={s.name}>{resolveSubjectCode(s.name).name} ({s.questionsCount} {t('qs_unit')})</option>
+                                    <option key={s.id || s.name} value={s.name}>{resolveSubjectCode(s.name).name} ({selectedExam.totalQuestions || 20} {t('qs_unit')} Practice)</option>
                                 ))}
                             </select>
                         </div>

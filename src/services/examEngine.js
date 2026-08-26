@@ -125,7 +125,9 @@ class ExamEngine {
             const sfLower = subjectFilter.toLowerCase();
             const matched = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, sfLower));
             const shuffled = this.fisherYatesShuffle(matched);
-            const selectedCount = Math.min(parseInt(count, 10) || 20, shuffled.length);
+            // Single Subject Practice generates full test question count (e.g. 20 questions) for that subject
+            const targetCount = exam.totalQuestions || parseInt(count, 10) || 20;
+            const selectedCount = Math.min(targetCount, shuffled.length);
             const resolvedSub = resolveSubjectCode(subjectFilter);
 
             generatedQuestions = shuffled.slice(0, selectedCount).map(q => ({
@@ -171,7 +173,7 @@ class ExamEngine {
             isFreeTest: !!exam.isFreeTest,
             examName: subjectFilter !== 'ALL' ? `${exam.name} (${resolvedSubjectDisplay} Practice)` : exam.name,
             examCode: exam.code,
-            durationMinutes: subjectFilter !== 'ALL' ? Math.ceil(selectedCount * 1.2) : exam.durationMinutes,
+            durationMinutes: subjectFilter !== 'ALL' ? Math.max(10, Math.ceil(generatedQuestions.length * 1.0)) : exam.durationMinutes,
             negativeMarkingRate: exam.negativeMarkingRate,
             totalMarks: generatedQuestions.reduce((sum, q) => sum + (q.marks || 1), 0),
             questions: generatedQuestions,
