@@ -6,6 +6,7 @@ import { useExam } from '../../context/ExamContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
 import { getExamAccess } from '../../utils/examAccess.js';
+import { resolveSubjectCode } from '../../constants/subjectCodes.js';
 
 export const ExamCatalogPage = () => {
     const router = useRouter();
@@ -218,7 +219,7 @@ export const ExamCatalogPage = () => {
                             >
                                 <option value="ALL">{t('all_subjects_mixed')}</option>
                                 {selectedExam.subjects && selectedExam.subjects.map(s => (
-                                    <option key={s.id || s.name} value={s.name}>{s.name} ({s.questionsCount} {t('qs_unit')})</option>
+                                    <option key={s.id || s.name} value={s.name}>{resolveSubjectCode(s.name).name} ({s.questionsCount} {t('qs_unit')})</option>
                                 ))}
                             </select>
                         </div>

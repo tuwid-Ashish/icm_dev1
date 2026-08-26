@@ -126,7 +126,14 @@ class ExamEngine {
             const matched = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, sfLower));
             const shuffled = this.fisherYatesShuffle(matched);
             const selectedCount = Math.min(parseInt(count, 10) || 20, shuffled.length);
-            generatedQuestions = shuffled.slice(0, selectedCount);
+            const resolvedSub = resolveSubjectCode(subjectFilter);
+
+            generatedQuestions = shuffled.slice(0, selectedCount).map(q => ({
+                ...q,
+                sectionId: resolvedSub.code,
+                sectionName: resolvedSub.name,
+                marks: q.marks || 1
+            }));
         } else {
             const shuffled = this.fisherYatesShuffle(batchQuestions);
             const selectedCount = Math.min(exam.totalQuestions || 20, shuffled.length);
@@ -153,6 +160,8 @@ class ExamEngine {
             paletteStates[q.id] = 'not_visited';
         });
 
+        const resolvedSubjectDisplay = subjectFilter !== 'ALL' ? resolveSubjectCode(subjectFilter).name : '';
+
         const session = {
             id: 'SESSION-' + Date.now().toString(36).toUpperCase(),
             studentId,
@@ -160,7 +169,7 @@ class ExamEngine {
             studentEmail: studentInfo?.studentEmail || currentUser?.email || 'student@sigma.com',
             examId: exam.id,
             isFreeTest: !!exam.isFreeTest,
-            examName: subjectFilter !== 'ALL' ? `${exam.name} (${subjectFilter} Practice)` : exam.name,
+            examName: subjectFilter !== 'ALL' ? `${exam.name} (${resolvedSubjectDisplay} Practice)` : exam.name,
             examCode: exam.code,
             durationMinutes: subjectFilter !== 'ALL' ? Math.ceil(selectedCount * 1.2) : exam.durationMinutes,
             negativeMarkingRate: exam.negativeMarkingRate,
