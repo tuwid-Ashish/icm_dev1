@@ -66,9 +66,12 @@ export const firestoreEngine = {
         if (isFirebaseConnected && db) {
             try {
                 const qId = questionData.id || 'Q-' + Date.now().toString(36).toUpperCase();
+                const resolvedSubject = resolveSubjectCode(questionData.subjectCode || questionData.subject);
                 const normalized = {
                     ...questionData,
                     id: qId,
+                    subjectCode: resolvedSubject.code,
+                    subject: resolvedSubject.name,
                     correctOption: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
                     correctIndex: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
                     updatedAt: new Date().toISOString()

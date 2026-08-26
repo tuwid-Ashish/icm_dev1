@@ -58,31 +58,27 @@ export class ExamEngine {
 
         const isQuestionMatchingSubject = (q, bpSubjectName) => {
             if (!q || !bpSubjectName) return false;
-            const qSub = (q.subject || '').toLowerCase();
-            const qCode = (q.subjectCode || '').toUpperCase();
+            
+            const bpResolved = resolveSubjectCode(bpSubjectName);
+            const qResolved = resolveSubjectCode(q.subjectCode || q.subject);
+
+            // 1. Direct Subject Code Matching (e.g. 'M1' === 'M1')
+            if (bpResolved.code !== 'OTHER' && qResolved.code !== 'OTHER' && bpResolved.code === qResolved.code) {
+                return true;
+            }
+
+            // 2. Direct Code Comparison (e.g. q.subjectCode === 'M1' or bpSubjectName === 'M1')
+            const bpCode = bpSubjectName.trim().toUpperCase();
+            const qCode = (q.subjectCode || qResolved.code || '').trim().toUpperCase();
+            if (bpCode === qCode && bpCode.startsWith('M')) {
+                return true;
+            }
+
+            // 3. String & Alias Matching
+            const qSub = (q.subject || qResolved.name || '').toLowerCase();
             const bpSub = String(bpSubjectName || '').toLowerCase();
 
             if (qSub === bpSub || qSub.includes(bpSub) || bpSub.includes(qSub)) return true;
-
-            const isMathBP = bpSub.includes('math') || bpSub.includes('अंकगणित') || bpSub.includes('गणित');
-            const isMathQ = qSub.includes('math') || qSub.includes('अंकगणित') || qSub.includes('गणित') || qCode === 'M1';
-            if (isMathBP && isMathQ) return true;
-
-            const isReasoningBP = bpSub.includes('reasoning') || bpSub.includes('intel') || bpSub.includes('बुद्धिमत्ता');
-            const isReasoningQ = qSub.includes('reasoning') || qSub.includes('intel') || qSub.includes('बुद्धिमत्ता') || qCode === 'M2';
-            if (isReasoningBP && isReasoningQ) return true;
-
-            const isGkBP = bpSub.includes('gk') || bpSub.includes('general') || bpSub.includes('सामान्य');
-            const isGkQ = qSub.includes('gk') || qSub.includes('general') || qSub.includes('सामान्य') || qCode === 'M3';
-            if (isGkBP && isGkQ) return true;
-
-            const isMarathiBP = bpSub.includes('marathi') || bpSub.includes('मराठी');
-            const isMarathiQ = (qSub.includes('marathi') || qSub.includes('मराठी')) && !qSub.includes('english') && qCode === 'M4';
-            if (isMarathiBP && isMarathiQ) return true;
-
-            const isEnglishBP = bpSub.includes('english') || bpSub.includes('इंग्रजी');
-            const isEnglishQ = qSub.includes('english') || qSub.includes('इंग्रजी') || qCode === 'M5';
-            if (isEnglishBP && isEnglishQ) return true;
 
             return false;
         };
