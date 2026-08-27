@@ -55,12 +55,12 @@ export const PackagesPage = () => {
                             return (
                                 <div key={pkg.id} style={{ background: 'var(--bg-surface)', border: alreadyPurchased ? '1px solid var(--success-border)' : '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: 'var(--shadow-sm)' }}>
                                     <div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                            <span className="badge badge-purple">{pkg.exam}</span>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                                            <span className="badge badge-purple" style={{ whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', maxWidth: '100%', borderRadius: 'var(--radius-md)', display: 'inline-block', flex: 1, minWidth: '120px' }}>{pkg.exam}</span>
                                             {alreadyPurchased ? (
-                                                <span className="badge badge-success">✓ Purchased</span>
+                                                <span className="badge badge-success" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>✓ Purchased</span>
                                             ) : (
-                                                <span className="badge badge-success">{pkg.validity}</span>
+                                                <span className="badge badge-success" style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>{pkg.validity}</span>
                                             )}
                                         </div>
                                         <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.35rem' }}>{pkg.name}</h4>

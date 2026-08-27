@@ -408,20 +408,19 @@ body {
 
 /* Rounded Pill Badges (Strictly Non-Wrapping Text) */
 .badge {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    white-space: nowrap !important; /* CRITICAL: PREVENTS VERTICAL TEXT WRAPPING */
-    width: auto !important;
-    max-width: none !important;
-    flex-shrink: 0 !important;
-    padding: 0.45rem 0.9rem !important;
-    border-radius: 9999px !important;
-    font-size: 0.75rem !important;
-    font-weight: 700 !important;
-    line-height: 1.2 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.3px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    width: auto;
+    max-width: 100%;
+    padding: 0.45rem 0.9rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .badge-success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
