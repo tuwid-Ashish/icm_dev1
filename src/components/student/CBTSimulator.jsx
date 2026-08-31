@@ -17,11 +17,17 @@ export const CBTSimulator = () => {
     } = useExam();
 
     if (!activeSession || !activeSession.questions || activeSession.questions.length === 0) {
-        return <div class="panel"><p>No active test session found.</p></div>;
+        return <div className="panel"><p>No active test session found.</p></div>;
     }
 
-    const q = activeSession.questions[currentQuestionIdx];
-    const userAns = activeSession.userAnswers[q.id];
+    // Defensive bounds safety check
+    const safeIdx = Math.min(Math.max(0, currentQuestionIdx), activeSession.questions.length - 1);
+    const q = activeSession.questions[safeIdx];
+    if (!q) {
+        return <div className="panel"><p>Question data unavailable.</p></div>;
+    }
+
+    const userAns = activeSession.userAnswers ? activeSession.userAnswers[q.id] : undefined;
 
     // Format timer
     const mins = Math.floor(timerSeconds / 60);
@@ -37,7 +43,7 @@ export const CBTSimulator = () => {
     let answeredMarkedCount = 0;
 
     activeSession.questions.forEach(item => {
-        const st = activeSession.paletteStates[item.id] || 'not_visited';
+        const st = (activeSession.paletteStates && activeSession.paletteStates[item.id]) || 'not_visited';
         if (st === 'not_visited') notVisitedCount++;
         else if (st === 'visited') visitedCount++;
         else if (st === 'answered') answeredCount++;
@@ -49,7 +55,7 @@ export const CBTSimulator = () => {
         let answered = 0;
         let unattempted = 0;
         activeSession.questions.forEach(item => {
-            if (activeSession.userAnswers[item.id] !== undefined) answered++;
+            if (activeSession.userAnswers && activeSession.userAnswers[item.id] !== undefined) answered++;
             else unattempted++;
         });
 
@@ -59,25 +65,25 @@ export const CBTSimulator = () => {
     };
 
     return (
-        <div class="cbt-container">
+        <div className="cbt-container">
             {/* Header */}
-            <div class="cbt-header">
+            <div className="cbt-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span class="badge badge-purple">{activeSession.examCode}</span>
+                    <span className="badge badge-purple">{activeSession.examCode || 'TEST'}</span>
                     <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem' }}>{activeSession.examName}</h3>
                 </div>
-                <div class={`cbt-timer ${isTimerWarning ? 'warning' : ''}`}>
+                <div className={`cbt-timer ${isTimerWarning ? 'warning' : ''}`}>
                     ⏱️ Time Remaining: {timeStr}
                 </div>
             </div>
 
-            <div class="cbt-body">
+            <div className="cbt-body">
                 {/* Main Question Area */}
-                <div class="cbt-question-area">
+                <div className="cbt-question-area">
                     <div>
-                        <div class="q-header">
-                            <span>Question {currentQuestionIdx + 1} of {activeSession.questions.length} ({q.sectionName || 'General'})</span>
-                            <span>Marks: +{q.marks || 1} | Neg: -{activeSession.negativeMarkingRate}</span>
+                        <div className="q-header">
+                            <span>Question {safeIdx + 1} of {activeSession.questions.length} ({q.sectionName || 'General'})</span>
+                            <span>Marks: +{q.marks || 1} | Neg: -{activeSession.negativeMarkingRate || 0}</span>
                         </div>
                         <div className="question-card">
                             <div className="q-text">
@@ -85,7 +91,7 @@ export const CBTSimulator = () => {
                             </div>
 
                             <div className="options-list">
-                                {q.options.map((optText, optIdx) => {
+                                {(q.options || []).map((optText, optIdx) => {
                                     const isSelected = userAns === optIdx;
                                     const labelLetter = String.fromCharCode(65 + optIdx);
                                     return (
@@ -106,27 +112,27 @@ export const CBTSimulator = () => {
                     </div>
 
                     {/* Controls */}
-                    <div class="cbt-actions">
+                    <div className="cbt-actions">
                         <div>
                             <button 
-                                class="btn btn-secondary" 
-                                disabled={currentQuestionIdx === 0}
-                                onClick={() => setCurrentQuestionIdx(prev => prev - 1)}
+                                className="btn btn-secondary" 
+                                disabled={safeIdx === 0}
+                                onClick={() => setCurrentQuestionIdx(safeIdx - 1)}
                             >
                                 ◄ Previous
                             </button>
-                            <button class="btn btn-secondary" onClick={() => clearAnswer(q.id)} style={{ marginLeft: '0.5rem' }}>
+                            <button className="btn btn-secondary" onClick={() => clearAnswer(q.id)} style={{ marginLeft: '0.5rem' }}>
                                 Clear Selection
                             </button>
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button class="btn btn-purple" style={{ background: 'var(--purple)', color: 'white' }} onClick={() => markForReview(q.id)}>
+                            <button className="btn btn-purple" style={{ background: 'var(--purple)', color: 'white' }} onClick={() => markForReview(q.id)}>
                                 🔖 Mark for Review & Next
                             </button>
-                            <button class="btn btn-primary" onClick={() => saveAndNext(q.id)}>
+                            <button className="btn btn-primary" onClick={() => saveAndNext(q.id)}>
                                 💾 Save & Next ►
                             </button>
-                            <button class="btn btn-danger" style={{ marginLeft: '1rem' }} onClick={handleSubmitClick}>
+                            <button className="btn btn-danger" style={{ marginLeft: '1rem' }} onClick={handleSubmitClick}>
                                 📤 Submit Test
                             </button>
                         </div>
@@ -134,25 +140,25 @@ export const CBTSimulator = () => {
                 </div>
 
                 {/* Question Palette Sidebar */}
-                <div class="cbt-palette-sidebar">
+                <div className="cbt-palette-sidebar">
                     <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem' }}>Question Palette</h4>
 
-                    <div class="palette-legend">
-                        <div class="legend-item"><div class="dot dot-answered"></div> Answered ({answeredCount})</div>
-                        <div class="legend-item"><div class="dot dot-visited"></div> Visited ({visitedCount})</div>
-                        <div class="legend-item"><div class="dot dot-marked"></div> Marked ({markedCount})</div>
-                        <div class="legend-item"><div class="dot dot-answered-marked"></div> Ans & Marked ({answeredMarkedCount})</div>
-                        <div class="legend-item"><div class="dot dot-not-visited"></div> Not Visited ({notVisitedCount})</div>
+                    <div className="palette-legend">
+                        <div className="legend-item"><div className="dot dot-answered"></div> Answered ({answeredCount})</div>
+                        <div className="legend-item"><div className="dot dot-visited"></div> Visited ({visitedCount})</div>
+                        <div className="legend-item"><div className="dot dot-marked"></div> Marked ({markedCount})</div>
+                        <div className="legend-item"><div className="dot dot-answered-marked"></div> Ans & Marked ({answeredMarkedCount})</div>
+                        <div className="legend-item"><div className="dot dot-not-visited"></div> Not Visited ({notVisitedCount})</div>
                     </div>
 
-                    <div class="palette-grid">
+                    <div className="palette-grid">
                         {activeSession.questions.map((item, idx) => {
-                            const st = activeSession.paletteStates[item.id] || 'not_visited';
-                            const isActive = idx === currentQuestionIdx;
+                            const st = (activeSession.paletteStates && activeSession.paletteStates[item.id]) || 'not_visited';
+                            const isActive = idx === safeIdx;
                             return (
                                 <button 
                                     key={item.id}
-                                    class={`palette-btn ${st} ${isActive ? 'active-q' : ''}`}
+                                    className={`palette-btn ${st} ${isActive ? 'active-q' : ''}`}
                                     onClick={() => jumpToQuestion(idx)}
                                 >
                                     {idx + 1}

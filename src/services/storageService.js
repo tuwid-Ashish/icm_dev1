@@ -45,6 +45,37 @@ class StorageService {
         delete sessions[sessionId];
         localStorage.setItem(STORAGE_KEYS.TEST_SESSIONS, JSON.stringify(sessions));
     }
+
+    // --- OFFLINE SUBMISSION & QUESTION CACHE FALLBACKS ---
+
+    saveSubmissionOffline(submission) {
+        if (typeof localStorage === 'undefined') return;
+        const key = 'cep_react_offline_submissions';
+        const subs = JSON.parse(localStorage.getItem(key) || '[]');
+        subs.unshift(submission);
+        localStorage.setItem(key, JSON.stringify(subs));
+    }
+
+    getSubmissionsOffline() {
+        if (typeof localStorage === 'undefined') return [];
+        return JSON.parse(localStorage.getItem('cep_react_offline_submissions') || '[]');
+    }
+
+    saveQuestionOffline(question) {
+        if (typeof localStorage === 'undefined') return;
+        const key = 'cep_react_offline_questions';
+        const questions = JSON.parse(localStorage.getItem(key) || '[]');
+        const idx = questions.findIndex(q => q.id === question.id);
+        if (idx !== -1) questions[idx] = question;
+        else questions.push(question);
+        localStorage.setItem(key, JSON.stringify(questions));
+    }
+
+    getQuestionsOffline() {
+        if (typeof localStorage === 'undefined') return [];
+        return JSON.parse(localStorage.getItem('cep_react_offline_questions') || '[]');
+    }
 }
 
 export const storageService = new StorageService();
+

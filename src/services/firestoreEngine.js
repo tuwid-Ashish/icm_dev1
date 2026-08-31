@@ -8,10 +8,14 @@ import {
     setDoc, 
     addDoc, 
     updateDoc,
-    deleteDoc
+    deleteDoc,
+    writeBatch
 } from './firebase.js';
 
 import { storageService } from './storageService.js';
+import { resolveSubjectCode } from '../constants/subjectCodes.js';
+
+
 
 export const firestoreEngine = {
     // 1. Fetch Exams (Source of Truth: Firestore 'exams' collection)
@@ -63,19 +67,20 @@ export const firestoreEngine = {
 
     // 3. Save Question (Firestore 'questions' collection)
     saveQuestion: async (questionData) => {
+        const qId = questionData.id || 'Q-' + Date.now().toString(36).toUpperCase();
+        const resolvedSubject = resolveSubjectCode(questionData.subjectCode || questionData.subject) || { code: 'OTHER', name: questionData.subject || 'General' };
+        const normalized = {
+            ...questionData,
+            id: qId,
+            subjectCode: resolvedSubject.code,
+            subject: resolvedSubject.name,
+            correctOption: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
+            correctIndex: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
+            updatedAt: new Date().toISOString()
+        };
+
         if (isFirebaseConnected && db) {
             try {
-                const qId = questionData.id || 'Q-' + Date.now().toString(36).toUpperCase();
-                const resolvedSubject = resolveSubjectCode(questionData.subjectCode || questionData.subject);
-                const normalized = {
-                    ...questionData,
-                    id: qId,
-                    subjectCode: resolvedSubject.code,
-                    subject: resolvedSubject.name,
-                    correctOption: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
-                    correctIndex: questionData.correctOption !== undefined ? questionData.correctOption : (questionData.correctIndex || 0),
-                    updatedAt: new Date().toISOString()
-                };
                 const qRef = doc(db, 'questions', qId);
                 await setDoc(qRef, normalized, { merge: true });
                 console.log('[Firestore Engine] Saved question to Cloud Firestore:', qId);
@@ -85,8 +90,60 @@ export const firestoreEngine = {
                 throw err;
             }
         }
-        throw new Error('Firestore database is not connected.');
+        storageService.saveQuestionOffline(normalized);
+        return normalized;
     },
+
+    // 3a. Save Bulk Questions in Atomic Batch Chunks (Firestore 'questions' collection)
+    saveQuestionsBulk: async (questionsList, onProgress) => {
+        if (!questionsList || questionsList.length === 0) return { count: 0 };
+
+        const normalizedList = questionsList.map(q => {
+            const qId = q.id || 'Q-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+            const resolvedSubject = resolveSubjectCode(q.subjectCode || q.subject) || { code: 'OTHER', name: q.subject || 'General' };
+            return {
+                ...q,
+                id: qId,
+                subjectCode: resolvedSubject.code,
+                subject: resolvedSubject.name,
+                correctOption: q.correctOption !== undefined ? q.correctOption : (q.correctIndex || 0),
+                correctIndex: q.correctOption !== undefined ? q.correctOption : (q.correctIndex || 0),
+                updatedAt: new Date().toISOString()
+            };
+        });
+
+        if (isFirebaseConnected && db) {
+            try {
+                // Firestore batch limit is 500 ops per commit; use 200 chunk size for safety
+                const CHUNK_SIZE = 200;
+                let totalSaved = 0;
+
+                for (let i = 0; i < normalizedList.length; i += CHUNK_SIZE) {
+                    const chunk = normalizedList.slice(i, i + CHUNK_SIZE);
+                    const batch = writeBatch(db);
+
+                    chunk.forEach(item => {
+                        const qRef = doc(db, 'questions', item.id);
+                        batch.set(qRef, item, { merge: true });
+                    });
+
+                    await batch.commit();
+                    totalSaved += chunk.length;
+                    if (onProgress) onProgress(totalSaved, normalizedList.length);
+                }
+                console.log(`[Firestore Engine] Bulk saved ${totalSaved} questions to Cloud Firestore.`);
+                return { count: totalSaved };
+            } catch (err) {
+                console.error('[Firestore Engine] Error during bulk question import:', err.message);
+                throw err;
+            }
+        }
+
+        // Offline fallback
+        normalizedList.forEach(item => storageService.saveQuestionOffline(item));
+        return { count: normalizedList.length };
+    },
+
 
     // 3b. Delete Question (Firestore 'questions' collection)
     deleteQuestion: async (questionId) => {

@@ -17,12 +17,12 @@ export const TestHistoryTable = ({ onViewResult }) => {
     }, [user]);
 
     return (
-        <div class="panel">
-            <div class="panel-header">
-                <h3 class="panel-title">📜 Completed Practice Test Records</h3>
+        <div className="panel">
+            <div className="panel-header">
+                <h3 className="panel-title">📜 Completed Practice Test Records</h3>
             </div>
-            <div class="table-container">
-                <table class="data-table">
+            <div className="table-container">
+                <table className="data-table">
                     <thead>
                         <tr>
                             <th>Exam</th>
@@ -45,9 +45,9 @@ export const TestHistoryTable = ({ onViewResult }) => {
                                     <td><strong>{sub.finalScore} / {sub.totalMarks}</strong></td>
                                     <td>{sub.percentage}%</td>
                                     <td>{sub.accuracy}%</td>
-                                    <td><span class={`badge ${sub.passed ? 'badge-success' : 'badge-danger'}`}>{sub.passed ? 'PASS' : 'FAIL'}</span></td>
+                                    <td><span className={`badge ${sub.passed ? 'badge-success' : 'badge-danger'}`}>{sub.passed ? 'PASS' : 'FAIL'}</span></td>
                                     <td>
-                                        <button class="btn btn-secondary btn-sm" onClick={() => onViewResult(sub)}>
+                                        <button className="btn btn-secondary btn-sm" onClick={() => onViewResult(sub)}>
                                             View Scorecard
                                         </button>
                                     </td>

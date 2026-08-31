@@ -214,31 +214,33 @@ export const ExamProvider = ({ children }) => {
         const sessionToSubmit = activeSessionRef.current;
         if (!sessionToSubmit) return;
 
-        const totalMins = sessionToSubmit.durationMinutes;
+        const totalMins = sessionToSubmit.durationMinutes || 20;
         const timeTakenSecs = Math.max(1, totalMins * 60 - timerRef.current);
 
         // Evaluate submission with complete userAnswers
         const evaluated = evaluateSubmission(sessionToSubmit, timeTakenSecs);
 
-        // Save scorecard submission to Cloud Firestore & LocalStorage
-        await firestoreEngine.saveSubmission(evaluated);
+        try {
+            // Save scorecard submission to Cloud Firestore & LocalStorage
+            await firestoreEngine.saveSubmission(evaluated);
 
-        // Only a successfully submitted, non-free test consumes a quota slot.
-        // A free test instead records a one-time "used" flag on submit — free
-        // tests have no quota to draw down, so this is what stops a student
-        // retaking the same free exam over and over.
-        if (!sessionToSubmit.isFreeTest) {
-            await firestoreEngine.decrementStudentQuota(sessionToSubmit.studentId);
-        } else {
-            await firestoreEngine.markFreeTestUsed(sessionToSubmit.studentId, sessionToSubmit.examId);
+            if (!sessionToSubmit.isFreeTest) {
+                await firestoreEngine.decrementStudentQuota(sessionToSubmit.studentId);
+            } else {
+                await firestoreEngine.markFreeTestUsed(sessionToSubmit.studentId, sessionToSubmit.examId);
+            }
+            if (refreshUser) refreshUser();
+        } catch (err) {
+            console.error('[ExamContext] Error saving submission remotely, saving offline fallback:', err);
+            storageService.saveSubmissionOffline(evaluated);
+        } finally {
+            // Always clear active session and display scorecard result to student
+            updateActiveSession(null);
+            setTimerSeconds(0);
+            setActiveResult(evaluated);
         }
-        refreshUser();
-
-        // Clear active session
-        updateActiveSession(null);
-        setTimerSeconds(0);
-        setActiveResult(evaluated);
     };
+
 
     // Abandon the current test without submitting — no scorecard is saved
     // and, since quota is only ever decremented on a real submit, no

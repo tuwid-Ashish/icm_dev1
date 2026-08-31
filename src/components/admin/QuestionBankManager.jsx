@@ -148,6 +148,8 @@ export const QuestionBankManager = ({ onRefresh }) => {
         }
     };
 
+    const [isSaving, setIsSaving] = useState(false);
+
     const handleSaveQuestion = async (e) => {
         e.preventDefault();
         const batchesToSave = isAllBatches ? ['ALL'] : selectedBatches;
@@ -174,11 +176,20 @@ export const QuestionBankManager = ({ onRefresh }) => {
             explanation: explanation || `Correct option is ${['A','B','C','D'][correctIdx]}`
         };
 
-        await firestoreEngine.saveQuestion(questionData);
-        setEditModalOpen(false);
-        await loadQuestions();
-        if (onRefresh) onRefresh();
+        setIsSaving(true);
+        try {
+            await firestoreEngine.saveQuestion(questionData);
+            setEditModalOpen(false);
+            await loadQuestions();
+            if (onRefresh) onRefresh();
+        } catch (err) {
+            console.error('[QuestionBankManager] Error saving question:', err);
+            alert('Failed to save question: ' + (err.message || 'Unknown error'));
+        } finally {
+            setIsSaving(false);
+        }
     };
+
 
     return (
         <div className="card">

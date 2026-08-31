@@ -59,27 +59,36 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
         }
     };
 
+    const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+
     const handleConfirmImport = async () => {
         if (!parsedPreview || parsedPreview.length === 0) return;
 
         setIsParsing(true);
-        let importedCount = 0;
+        setValidationError('');
+        setSuccessMessage('');
+        setImportProgress({ current: 0, total: parsedPreview.length });
 
-        for (const qData of parsedPreview) {
-            await firestoreEngine.saveQuestion(qData);
-            importedCount++;
+        try {
+            const res = await firestoreEngine.saveQuestionsBulk(parsedPreview, (current, total) => {
+                setImportProgress({ current, total });
+            });
+
+            setSuccessMessage(`Successfully imported ${res.count} questions into Question Bank!`);
+            setParsedPreview(null);
+            setRawText('');
+            setSelectedFile(null);
+
+            setTimeout(() => {
+                if (onRefresh) onRefresh();
+                onClose();
+            }, 1800);
+        } catch (err) {
+            console.error('[BulkUploadModal] Error importing questions:', err);
+            setValidationError(`Failed to import questions: ${err.message || 'Unknown error'}`);
+        } finally {
+            setIsParsing(false);
         }
-
-        setIsParsing(false);
-        setSuccessMessage(`Successfully imported ${importedCount} questions into Question Bank!`);
-        setParsedPreview(null);
-        setRawText('');
-        setSelectedFile(null);
-        
-        setTimeout(() => {
-            if (onRefresh) onRefresh();
-            onClose();
-        }, 1800);
     };
 
     return (
@@ -91,19 +100,22 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
             maxWidth="780px"
             footer={
                 <>
-                    <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
+                    <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={isParsing}>Cancel</button>
                     {!parsedPreview ? (
                         <button type="button" className="btn btn-primary" onClick={handleParsePreview} disabled={isParsing}>
                             {isParsing ? 'Validating CSV...' : 'Parse & Validate CSV'}
                         </button>
                     ) : (
                         <button type="button" className="btn btn-primary" onClick={handleConfirmImport} disabled={isParsing}>
-                            {isParsing ? 'Importing...' : `Confirm & Save ${parsedPreview.length} Questions`}
+                            {isParsing 
+                                ? `Importing (${importProgress.current}/${importProgress.total || parsedPreview.length})...` 
+                                : `Confirm & Save ${parsedPreview.length} Questions`}
                         </button>
                     )}
                 </>
             }
         >
+
             {validationError && (
                 <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
                     {validationError}
