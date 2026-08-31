@@ -8,8 +8,6 @@ export const AuthModal = ({ isOpen, onClose }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
-    if (!isOpen) return null;
-
     const handleSelectRole = (r) => {
         setRole(r);
         setEmail('');
@@ -25,6 +23,8 @@ export const AuthModal = ({ isOpen, onClose }) => {
             alert(res.message || 'Login failed.');
         }
     };
+
+    if (!isOpen) return null;
 
     return (
         <Modal

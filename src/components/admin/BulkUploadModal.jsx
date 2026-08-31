@@ -12,8 +12,6 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
     const [validationError, setValidationError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
 
-    if (!isOpen) return null;
-
     // Resets all local state before handing control back to the parent —
     // otherwise Cancel (or the modal's own ✕) leaves the preview/error/file
     // state sitting around, and reopening the modal shows stale results
@@ -60,6 +58,8 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
     };
 
     const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+
+    if (!isOpen) return null;
 
     const handleConfirmImport = async () => {
         if (!parsedPreview || parsedPreview.length === 0) return;
