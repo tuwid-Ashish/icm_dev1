@@ -7,13 +7,17 @@ import { MathExpressionEditor } from '../common/MathExpressionEditor.jsx';
 import { MathToolbar } from './MathToolbar.jsx';
 import { looksLikeMathContent } from '../../utils/mathContent.js';
 import { SUBJECT_CODES, resolveSubjectCode } from '../../constants/subjectCodes.js';
+import { SubjectWiseCountWidget } from './SubjectWiseCountWidget.jsx';
+
 
 export const QuestionBankManager = ({ onRefresh }) => {
     const [questions, setQuestions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [batchFilter, setBatchFilter] = useState('ALL');
+    const [subjectFilter, setSubjectFilter] = useState('ALL');
     const [bulkModalOpen, setBulkModalOpen] = useState(false);
+
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingQ, setEditingQ] = useState(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -74,6 +78,12 @@ export const QuestionBankManager = ({ onRefresh }) => {
     }, [batchFilter]);
 
     let filtered = questions;
+    if (subjectFilter !== 'ALL') {
+        filtered = filtered.filter(item => {
+            const resolved = resolveSubjectCode(item.subjectCode || item.subject);
+            return (resolved && resolved.code === subjectFilter) || item.subjectCode === subjectFilter;
+        });
+    }
     if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         filtered = filtered.filter(item => 
@@ -84,6 +94,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
             (item.id && item.id.toLowerCase().includes(query))
         );
     }
+
 
     const handleOpenEditModal = (q = null) => {
         setEditingQ(q);
@@ -208,12 +219,19 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 </div>
             </div>
 
+            {/* 📊 Subject-Wise Question Count Window (M1 - M9 Matrix) */}
+            <SubjectWiseCountWidget 
+                questions={questions} 
+                selectedSubject={subjectFilter} 
+                onSelectSubject={setSubjectFilter} 
+            />
+
             {/* Filter Bar */}
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                 <input 
                     type="text" 
                     className="form-control" 
-                    style={{ flex: 1, minWidth: '220px' }}
+                    style={{ flex: 1.5, minWidth: '220px' }}
                     placeholder="Search question text, ID or subject..." 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
@@ -221,9 +239,22 @@ export const QuestionBankManager = ({ onRefresh }) => {
 
                 <select 
                     className="form-control" 
+                    value={subjectFilter}
+                    onChange={e => setSubjectFilter(e.target.value)}
+                    style={{ flex: 1, minWidth: '180px' }}
+                >
+                    <option value="ALL">All Subjects (M1–M9)</option>
+                    {SUBJECT_CODES.map(s => (
+                        <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                    ))}
+                    <option value="OTHER">Other / Custom Subjects</option>
+                </select>
+
+                <select 
+                    className="form-control" 
                     value={batchFilter}
                     onChange={e => setBatchFilter(e.target.value)}
-                    style={{ flex: 1, minWidth: '200px' }}
+                    style={{ flex: 1, minWidth: '180px' }}
                 >
                     <option value="ALL">All Exam Batches</option>
                     <option value="Police Bharti">Police Bharti</option>
@@ -231,6 +262,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                     <option value="SSC GD">SSC GD Constable</option>
                 </select>
             </div>
+
 
             <div className="table-wrapper">
                 <table className="data-table">

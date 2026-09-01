@@ -6,6 +6,7 @@ import { FreeTestManager } from '../../components/admin/FreeTestManager.jsx';
 import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { ExamPaperGenerator } from '../../components/admin/ExamPaperGenerator.jsx';
+import { SubjectWiseCountWidget } from '../../components/admin/SubjectWiseCountWidget.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
@@ -13,11 +14,12 @@ export const AdminDashboardPage = () => {
     const { t } = useLanguage();
     // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'exams' | 'reports' | 'exam_paper'
     const [activeTab, setActiveTab] = useState('overview');
+    const [questions, setQuestions] = useState([]);
     const [stats, setStats] = useState({
-        totalStudents: 2,
-        totalQuestions: 68,
-        totalExams: 3,
-        totalPackages: 3,
+        totalStudents: 0,
+        totalQuestions: 0,
+        totalExams: 0,
+        totalPackages: 0,
         totalSubmissions: 0
     });
 
@@ -25,14 +27,15 @@ export const AdminDashboardPage = () => {
         const qList = await firestoreEngine.getQuestions('ALL');
         const eList = await firestoreEngine.getExams();
         const sList = await firestoreEngine.getSubmissions();
-        const pkgLocal = localStorage.getItem('sigma_course_packages');
-        const pkgCount = pkgLocal ? JSON.parse(pkgLocal).length : 3;
+        const pkgList = await firestoreEngine.getPackages();
+        const stdList = await firestoreEngine.getStudents();
 
+        setQuestions(qList);
         setStats({
-            totalStudents: 2,
+            totalStudents: stdList.length,
             totalQuestions: qList.length,
             totalExams: eList.length,
-            totalPackages: pkgCount,
+            totalPackages: pkgList.length,
             totalSubmissions: sList.length
         });
     };
@@ -40,6 +43,7 @@ export const AdminDashboardPage = () => {
     useEffect(() => {
         loadStats();
     }, []);
+
 
     return (
         <div>
@@ -134,7 +138,14 @@ export const AdminDashboardPage = () => {
                         </div>
                     </div>
 
+                    {/* 📊 Live Subject-Wise Question Count Window (M1 - M9 Matrix) */}
+                    <SubjectWiseCountWidget 
+                        questions={questions} 
+                        onSelectSubject={() => setActiveTab('questions')} 
+                    />
+
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+
                         <div className="card">
                             <div className="card-header">
                                 <h3 className="card-title">Quick Administrative Actions</h3>
