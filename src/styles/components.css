@@ -981,11 +981,7 @@ textarea.form-control { resize: vertical; min-height: 100px; }
         border-radius: 0 !important;
         box-shadow: none !important;
         background: #fff !important;
-        /* Real padding, not 0 — @page margin is only a *default* in the print
-           dialog; if the admin picks "Margins: None" there, the browser
-           overrides it entirely and content would butt straight up against
-           the paper edge without this. This is the actual safety margin. */
-        padding: 14mm 12mm !important;
+        padding: 4mm 2mm !important;
         box-sizing: border-box !important;
     }
     .no-print {

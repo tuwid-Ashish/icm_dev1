@@ -24,7 +24,7 @@ export const ExamPaperGenerator = () => {
     const [questions, setQuestions] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const [selectedBatches, setSelectedBatches] = useState([...EXAM_BATCHES]);
+    const [selectedBatches, setSelectedBatches] = useState(['ALL', ...EXAM_BATCHES]);
     const [selectedSubjects, setSelectedSubjects] = useState([]);
     const [questionTypeFilter, setQuestionTypeFilter] = useState('all');
     const [sortBy, setSortBy] = useState('subject');
@@ -53,53 +53,58 @@ export const ExamPaperGenerator = () => {
 
     const availableSubjects = useMemo(() => {
         const set = new Set();
-        questions.forEach(q => { if (q.subject) set.add(subjectLabel(q)); });
+        questions.forEach(q => { 
+            const s = q.subject || q.subjectCode;
+            if (s) set.add(subjectLabel(q)); 
+        });
         return Array.from(set).sort();
     }, [questions]);
 
-    // Default to "all subjects selected" once we know what subjects exist.
+    // Default to "all subjects selected" whenever available subjects load from Firestore.
     useEffect(() => {
-        if (availableSubjects.length > 0 && selectedSubjects.length === 0) {
+        if (availableSubjects.length > 0) {
             setSelectedSubjects(availableSubjects);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableSubjects]);
 
     const toggleInArray = (arr, setArr, value) => {
-        setArr(arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
+        if (value === 'ALL') {
+            if (arr.includes('ALL')) {
+                setArr([]);
+            } else {
+                setArr(['ALL', ...EXAM_BATCHES]);
+            }
+        } else {
+            const next = arr.includes(value) ? arr.filter(v => v !== value && v !== 'ALL') : [...arr.filter(v => v !== 'ALL'), value];
+            setArr(next.length === EXAM_BATCHES.length ? ['ALL', ...EXAM_BATCHES] : next);
+        }
     };
 
     // Candidate pool: everything matching the batch/subject/type filters.
-    // This is what the hand-pick list below shows — filters narrow the
-    // pool, they don't decide what's in the paper by themselves anymore.
     const candidateQuestions = useMemo(() => {
         return questions.filter(q => {
-            const qBatches = Array.isArray(q.batches) ? q.batches : (q.batch ? q.batch.split(', ') : []);
-            const batchMatch = qBatches.includes('ALL') || qBatches.some(b => selectedBatches.includes(b));
-            // No "empty means match-all" escape hatch here on purpose — the
-            // "None" button sets this to [], and it should mean exactly
-            // that (show nothing) rather than silently matching everything.
-            // Initial population to "all subjects" happens once via the
-            // effect below, before the admin has touched anything.
-            const subjectMatch = selectedSubjects.includes(subjectLabel(q));
-            // questionType is only set on questions authored through the
-            // newer math editor — most legacy/bulk-imported questions never
-            // got it set even when their text does contain LaTeX. Falling
-            // back to content-sniffing (the same heuristic QuestionBankManager
-            // uses to pick a default edit mode) so "Mathematical" actually
-            // finds them instead of only the handful with the field set.
+            const rawBatches = Array.isArray(q.batches) && q.batches.length > 0
+                ? q.batches
+                : (q.batch ? q.batch.split(/[;,]/) : ['ALL']);
+            
+            const qBatches = rawBatches.map(b => (b || '').trim().toLowerCase()).filter(Boolean);
+
+            const isAllSelected = selectedBatches.includes('ALL') || selectedBatches.length === 0;
+            const batchMatch = isAllSelected || 
+                qBatches.includes('all') || 
+                qBatches.some(b => selectedBatches.some(sb => sb.toLowerCase() === b || b.includes(sb.toLowerCase())));
+
+            const subjectMatch = selectedSubjects.length === 0 || selectedSubjects.includes(subjectLabel(q));
             const isMathematical = q.questionType === 'mathematical' || looksLikeMathContent(q.text);
             const typeMatch = questionTypeFilter === 'all' || (questionTypeFilter === 'mathematical' ? isMathematical : !isMathematical);
+            
             return batchMatch && subjectMatch && typeMatch;
         });
     }, [questions, selectedBatches, selectedSubjects, questionTypeFilter]);
 
-    // Whenever the filters change (new candidate pool), default to
-    // everything selected — admin can then uncheck individual questions,
-    // or hit "Deselect All" and hand-pick from scratch.
+    // Whenever candidateQuestions changes from new Firestore fetch, default to selecting all
     useEffect(() => {
         setSelectedIds(new Set(candidateQuestions.map(q => q.id)));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [candidateQuestions]);
 
     const toggleQuestionSelected = (id) => {
@@ -109,6 +114,15 @@ export const ExamPaperGenerator = () => {
             return next;
         });
     };
+
+    const handleSelectAllCandidates = () => {
+        setSelectedIds(new Set(candidateQuestions.map(q => q.id)));
+    };
+
+    const handleDeselectAll = () => {
+        setSelectedIds(new Set());
+    };
+
 
     // Picker list grouped by subject — mirrors how an admin actually builds
     // a paper ("10 from Maths, 5 from Reasoning...") instead of one long
@@ -227,8 +241,26 @@ export const ExamPaperGenerator = () => {
 
                 <div className="form-grid-2col" style={{ marginBottom: '1rem', alignItems: 'start' }}>
                     <div className="form-group">
-                        <label className="form-label">Exam Batches</label>
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Exam Batches</span>
+                            <span style={{ display: 'flex', gap: '0.4rem' }}>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedBatches(['ALL', ...EXAM_BATCHES])}>All</button>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedBatches([])}>None</button>
+                            </span>
+                        </label>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                                type="button"
+                                onClick={() => toggleInArray(selectedBatches, setSelectedBatches, 'ALL')}
+                                style={{
+                                    padding: '0.35rem 0.8rem', borderRadius: 'var(--radius-full)', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                                    border: selectedBatches.includes('ALL') ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                                    background: selectedBatches.includes('ALL') ? 'var(--primary)' : 'var(--bg-surface)',
+                                    color: selectedBatches.includes('ALL') ? '#ffffff' : 'var(--text-secondary)'
+                                }}
+                            >
+                                All Batches
+                            </button>
                             {EXAM_BATCHES.map(b => (
                                 <button
                                     key={b}
@@ -250,7 +282,7 @@ export const ExamPaperGenerator = () => {
                     <div className="form-group">
                         <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>Subjects</span>
-                            <span style={{ display: 'flex', gap: '0.5rem' }}>
+                            <span style={{ display: 'flex', gap: '0.4rem' }}>
                                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedSubjects(availableSubjects)}>All</button>
                                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedSubjects([])}>None</button>
                             </span>
@@ -293,26 +325,55 @@ export const ExamPaperGenerator = () => {
                         </select>
                     </div>
                     <div className="form-group">
-                        <label className="form-label">Limit Total Questions (optional)</label>
-                        <input type="number" min="1" className="form-control" value={questionLimit} onChange={e => setQuestionLimit(e.target.value)} placeholder="All selected" />
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Total Questions Limit</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {questionLimit ? `Cap: ${questionLimit} Qs` : 'Full Selection'}
+                            </span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <input 
+                                type="number" 
+                                min="1" 
+                                className="form-control" 
+                                value={questionLimit} 
+                                onChange={e => setQuestionLimit(e.target.value)} 
+                                placeholder="No limit (All)" 
+                            />
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuestionLimit('50')}>50</button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuestionLimit('100')}>100</button>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuestionLimit('')}>All</button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Running selection summary — visibility into what's been
-                    picked so far without having to scroll the whole list. */}
+                {/* Running selection summary */}
                 <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <strong style={{ fontSize: '0.88rem' }}>
-                            {selectedIds.size} questions selected · {[...selectedIds].reduce((sum, id) => {
-                                const q = candidateQuestions.find(cq => cq.id === id);
-                                return sum + (q?.marks || 1);
-                            }, 0)} marks
-                        </strong>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button type="button" className={`btn btn-sm ${pickerShowMode === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPickerShowMode('all')}>Show All</button>
-                            <button type="button" className={`btn btn-sm ${pickerShowMode === 'selected' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPickerShowMode('selected')}>Show Selected Only</button>
+                        <div>
+                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                                {finalQuestions.length} Questions in Printable Paper
+                            </strong>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                ({selectedIds.size} selected from {candidateQuestions.length} available pool · {totalMarks} marks)
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={handleSelectAllCandidates}>
+                                Select All Filtered ({candidateQuestions.length})
+                            </button>
+                            <button type="button" className="btn btn-sm btn-secondary" onClick={handleDeselectAll}>
+                                Clear Selection
+                            </button>
+                            <button type="button" className={`btn btn-sm ${pickerShowMode === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPickerShowMode('all')}>
+                                Show All
+                            </button>
+                            <button type="button" className={`btn btn-sm ${pickerShowMode === 'selected' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPickerShowMode('selected')}>
+                                Show Selected
+                            </button>
                         </div>
                     </div>
+
                     {selectionBySubject.length > 0 && (
                         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
                             {selectionBySubject.map(([subject, { count, marks }]) => (
