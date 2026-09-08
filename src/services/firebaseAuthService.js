@@ -14,6 +14,26 @@ import {
 import { storageService } from './storageService.js';
 
 export const firebaseAuthService = {
+    /**
+     * Reads the signed `admin` custom claim off the current ID token.
+     *
+     * Granted only by scripts/grantAdminClaim.js (Admin SDK) and verified by
+     * Firebase, so unlike the old email-substring check — and unlike the
+     * users/{uid}.role field, which any signed-in client could once overwrite —
+     * this cannot be forged from the browser. The Firestore rules check the
+     * same claim, so UI gating and data access can never disagree.
+     */
+    hasAdminClaim: async (firebaseUser) => {
+        if (!firebaseUser) return false;
+        try {
+            const tokenResult = await firebaseUser.getIdTokenResult();
+            return tokenResult?.claims?.admin === true;
+        } catch (e) {
+            console.error('[Firebase Auth] Could not read custom claims:', e.message);
+            return false;
+        }
+    },
+
     // 1. Register New Student Account
     registerStudent: async (name, email, password, mobile) => {
         if (isFirebaseConnected && auth && db) {
@@ -28,7 +48,11 @@ export const firebaseAuthService = {
                     name,
                     email,
                     mobile: mobile || '',
-                    role: email === 'admin@sigma.com' ? 'admin' : 'student',
+                    // Always 'student'. Admin is granted out-of-band by
+                    // scripts/grantAdminClaim.js, which sets a Firebase custom
+                    // claim; deriving it from the email address here meant
+                    // anyone could self-register into it.
+                    role: 'student',
                     allowedTests: 0,
                     remainingTests: 0,
                     completedTests: 0,
@@ -58,10 +82,17 @@ export const firebaseAuthService = {
                 const userCred = await signInWithEmailAndPassword(auth, email, password);
                 const uid = userCred.user.uid;
 
+                // The custom claim is the only authority on admin. It is signed
+                // by Firebase, cannot be set from the browser, and is what the
+                // Firestore rules check — so the client agrees with the server
+                // by construction. The users/{uid}.role field is a display
+                // mirror of it, nothing more.
+                const isAdmin = await firebaseAuthService.hasAdminClaim(userCred.user);
+
                 const userDoc = await getDoc(doc(db, 'users', uid));
                 let userProfile = null;
                 if (userDoc.exists()) {
-                    userProfile = { id: userDoc.id, uid: userDoc.id, ...userDoc.data() };
+                    userProfile = { id: userDoc.id, uid: userDoc.id, ...userDoc.data(), role: isAdmin ? 'admin' : 'student' };
                 } else {
                     userProfile = {
                         uid,
@@ -69,7 +100,11 @@ export const firebaseAuthService = {
                         name: userCred.user.displayName || email.split('@')[0],
                         email,
                         mobile: '',
-                        role: email.toLowerCase().includes('admin') ? 'admin' : 'student',
+                        // Never infer admin from the email text — an address
+                        // containing "admin" is user-supplied input, not proof
+                        // of anything. A first-time profile is always a student;
+                        // admin comes from the verified custom claim below.
+                        role: 'student',
                         allowedTests: 0,
                         remainingTests: 0,
                         completedTests: 0,
@@ -117,9 +152,13 @@ export const firebaseAuthService = {
             return onAuthStateChanged(auth, async (authUser) => {
                 if (authUser) {
                     try {
+                        // Same rule as loginUser: role comes from the signed
+                        // custom claim, never from the email text or from a
+                        // field the client could have written.
+                        const role = (await firebaseAuthService.hasAdminClaim(authUser)) ? 'admin' : 'student';
                         const userDoc = await getDoc(doc(db, 'users', authUser.uid));
                         if (userDoc.exists()) {
-                            const p = { id: userDoc.id, uid: userDoc.id, ...userDoc.data() };
+                            const p = { id: userDoc.id, uid: userDoc.id, ...userDoc.data(), role };
                             storageService.setCurrentUser(p);
                             callback(p);
                         } else {
@@ -128,7 +167,7 @@ export const firebaseAuthService = {
                                 id: authUser.uid,
                                 name: authUser.displayName || authUser.email.split('@')[0],
                                 email: authUser.email,
-                                role: authUser.email.includes('admin') ? 'admin' : 'student',
+                                role,
                                 status: 'active'
                             };
                             storageService.setCurrentUser(p);

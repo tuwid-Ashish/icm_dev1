@@ -93,21 +93,25 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                 color: '#ea580c'
             },
             handler: async function (response) {
+                // Only the ids go to the server. It takes the buyer from the
+                // Firebase ID token, the price and quota from the package
+                // document, and the amount paid from the Razorpay API — so
+                // there is nothing here worth tampering with.
                 const res = await firestoreEngine.verifyRazorpayPayment({
                     orderId: response.razorpay_order_id,
                     paymentId: response.razorpay_payment_id,
                     signature: response.razorpay_signature,
-                    student: user,
-                    pkg,
-                    amount: amountToPay
+                    packageId: pkg.id
                 });
                 setLoading(false);
 
                 if (res.success) {
                     setSuccessPaymentId(response.razorpay_payment_id);
-                    setSuccessMessage(t('quota_credited_msg'));
+                    setSuccessMessage(res.message || t('quota_credited_msg'));
                     setTimeout(() => {
-                        if (onSuccess) onSuccess(res.user);
+                        // The server wrote the quota; re-read the profile
+                        // rather than trusting a locally-built user object.
+                        if (onSuccess) onSuccess();
                         onClose();
                     }, 3000);
                 } else {

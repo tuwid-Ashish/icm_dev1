@@ -1,7 +1,8 @@
-import { 
-    db, 
-    isFirebaseConnected, 
-    collection, 
+import {
+    auth,
+    db,
+    isFirebaseConnected,
+    collection,
     getDocs, 
     doc, 
     getDoc, 
@@ -9,15 +10,122 @@ import {
     addDoc, 
     updateDoc,
     deleteDoc,
-    writeBatch
+    writeBatch,
+    query,
+    where,
+    getCountFromServer
 } from './firebase.js';
 
 import { storageService } from './storageService.js';
-import { resolveSubjectCode } from '../constants/subjectCodes.js';
+import { resolveSubjectCode, DEFAULT_SUBJECT_CODES, setDynamicSubjectCodes } from '../constants/subjectCodes.js';
 
-
+/**
+ * Combines the built-in M1-M9 defaults with whatever is in the local cache,
+ * keyed by code, cache winning on conflict.
+ *
+ * The previous `offline.length > 0 ? offline : DEFAULTS` treated a partial
+ * cache as a complete dataset, so the first locally-saved subject replaced all
+ * nine defaults — one added code made the other nine disappear. A merge can
+ * only ever return a superset of the defaults.
+ */
+function mergeSubjectCodes(cached) {
+    const byCode = new Map();
+    DEFAULT_SUBJECT_CODES.forEach(s => byCode.set(s.code, s));
+    (cached || []).forEach(s => {
+        const code = (s.code || s.id || '').toUpperCase();
+        if (code) byCode.set(code, { ...byCode.get(code), ...s, code });
+    });
+    return [...byCode.values()].sort(
+        (a, b) => (a.order || 99) - (b.order || 99) || (a.code || '').localeCompare(b.code || '')
+    );
+}
 
 export const firestoreEngine = {
+    // 0. Subject Codes & Subject Master CRUD
+    getSubjectCodes: async () => {
+        if (isFirebaseConnected && db) {
+            try {
+                const snapshot = await getDocs(collection(db, 'subject_codes'));
+                if (!snapshot.empty) {
+                    const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    list.sort((a, b) => (a.order || 99) - (b.order || 99) || (a.code || '').localeCompare(b.code || ''));
+                    setDynamicSubjectCodes(list);
+                    return list;
+                }
+                
+                // Seed initial defaults if empty
+                console.log('[Firestore Engine] Seeding default subject codes (M1-M9)...');
+                const batch = writeBatch(db);
+                DEFAULT_SUBJECT_CODES.forEach((s, idx) => {
+                    const sRef = doc(db, 'subject_codes', s.code);
+                    batch.set(sRef, { ...s, id: s.code, order: idx + 1, updatedAt: new Date().toISOString() });
+                });
+                await batch.commit();
+                setDynamicSubjectCodes(DEFAULT_SUBJECT_CODES);
+                return DEFAULT_SUBJECT_CODES;
+            } catch (err) {
+                console.error('[Firestore Engine] Error fetching subject codes from Firestore:', err.message);
+                const res = mergeSubjectCodes(storageService.getSubjectCodesOffline());
+                setDynamicSubjectCodes(res);
+                return res;
+            }
+        }
+        const res = mergeSubjectCodes(storageService.getSubjectCodesOffline());
+        setDynamicSubjectCodes(res);
+        return res;
+    },
+
+    saveSubjectCode: async (subjectData) => {
+        const rawCode = (subjectData.code || '').trim().toUpperCase();
+        if (!rawCode) throw new Error('Subject code is required (e.g. M10).');
+
+        const normalized = {
+            id: rawCode,
+            code: rawCode,
+            name: subjectData.name ? subjectData.name.trim() : rawCode,
+            name_mr: subjectData.name_mr ? subjectData.name_mr.trim() : (subjectData.name || rawCode),
+            color: subjectData.color || '#6366f1',
+            aliases: subjectData.aliases ? (typeof subjectData.aliases === 'string' ? subjectData.aliases.trim() : subjectData.aliases) : '',
+            order: parseInt(subjectData.order, 10) || 99,
+            updatedAt: new Date().toISOString()
+        };
+
+        if (isFirebaseConnected && db) {
+            try {
+                const sRef = doc(db, 'subject_codes', rawCode);
+                await setDoc(sRef, normalized, { merge: true });
+                console.log('[Firestore Engine] Saved subject code:', rawCode);
+            } catch (err) {
+                console.error('[Firestore Engine] Error saving subject code to Firestore:', err.message);
+            }
+        }
+
+        storageService.saveSubjectCodeOffline(normalized);
+        const all = await firestoreEngine.getSubjectCodes();
+        setDynamicSubjectCodes(all);
+        return normalized;
+    },
+
+    deleteSubjectCode: async (code) => {
+        const cleanCode = (code || '').trim().toUpperCase();
+        if (!cleanCode) return { success: false };
+
+        if (isFirebaseConnected && db) {
+            try {
+                const sRef = doc(db, 'subject_codes', cleanCode);
+                await deleteDoc(sRef);
+                console.log('[Firestore Engine] Deleted subject code from Firestore:', cleanCode);
+            } catch (err) {
+                console.error('[Firestore Engine] Error deleting subject code from Firestore:', err.message);
+            }
+        }
+
+        storageService.deleteSubjectCodeOffline(cleanCode);
+        const all = await firestoreEngine.getSubjectCodes();
+        setDynamicSubjectCodes(all);
+        return { success: true };
+    },
+
     // 1. Fetch Exams (Source of Truth: Firestore 'exams' collection)
     getExams: async () => {
         if (isFirebaseConnected && db) {
@@ -63,6 +171,32 @@ export const firestoreEngine = {
             }
         }
         return [];
+    },
+
+    // 2b. How many questions exist per subject code.
+    //
+    // Uses Firestore's count aggregation, which is billed at roughly one read
+    // per 1000 matched index entries rather than one per document — so the
+    // blueprint editor can show live availability without pulling the whole
+    // 2000+ question bank into the browser just to call .length on it.
+    getQuestionCountsBySubject: async (codes = []) => {
+        const counts = {};
+        if (!isFirebaseConnected || !db || !codes.length) return counts;
+
+        await Promise.all(codes.map(async (code) => {
+            try {
+                const snap = await getCountFromServer(
+                    query(collection(db, 'questions'), where('subjectCode', '==', code))
+                );
+                counts[code] = snap.data().count;
+            } catch (err) {
+                // Leave the code absent rather than reporting a confident 0 —
+                // "we could not check" and "there are none" must not look alike.
+                console.error(`[Firestore Engine] Count failed for subject ${code}:`, err.message);
+            }
+        }));
+
+        return counts;
     },
 
     // 3. Save Question (Firestore 'questions' collection)
@@ -384,21 +518,24 @@ export const firestoreEngine = {
     },
 
     // 10. Fetch Test Attempts Log (Source of Truth: Firestore 'test_attempts' collection)
+    // Pass a studentId for a student's own history; omit it only from admin
+    // screens, which is the sole context allowed to read the whole collection.
+    //
+    // This used to fetch every attempt and filter in JavaScript. Security rules
+    // are not filters — under owner-scoped rules a collection read that touches
+    // one forbidden document fails outright, so the filtering has to happen in
+    // the query. It also stops every student pulling the entire table (and
+    // every other student's answers) down to their browser.
     getSubmissions: async (studentId = null) => {
         if (isFirebaseConnected && db) {
             try {
-                const snapshot = await getDocs(collection(db, 'test_attempts'));
+                const ref = collection(db, 'test_attempts');
+                const snapshot = await getDocs(
+                    studentId ? query(ref, where('studentId', '==', studentId)) : ref
+                );
                 let attempts = [];
                 if (!snapshot.empty) {
                     attempts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                }
-
-                if (studentId) {
-                    attempts = attempts.filter(s => 
-                        s.studentId === studentId || 
-                        s.uid === studentId || 
-                        (s.studentEmail && s.studentEmail.toLowerCase() === studentId.toLowerCase())
-                    );
                 }
                 attempts.sort((a, b) => new Date(b.submittedAt || b.createdAt || 0) - new Date(a.submittedAt || a.createdAt || 0));
                 console.log(`[Firestore Engine] Fetched ${attempts.length} test attempts from test_attempts collection.`);
@@ -409,6 +546,31 @@ export const firestoreEngine = {
             }
         }
         return [];
+    },
+
+    // 10b. Rank + anonymised top-10 for one exam, computed server-side.
+    // The scorecard used to read every attempt in the database to work this
+    // out, exposing all students' emails, uids and answer reviews to each
+    // other. /api/leaderboard returns display names and scores only.
+    getExamLeaderboard: async ({ examId, attemptId, finalScore, timeTakenSeconds, totalMarks, accuracy }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) return null;
+
+        try {
+            const res = await fetch('/api/leaderboard', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ examId, attemptId, finalScore, timeTakenSeconds, totalMarks, accuracy })
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (e) {
+            console.error('[Firestore Engine] Leaderboard fetch failed:', e.message);
+            return null;
+        }
     },
 
     // 11. Course Packages Management (Source of Truth: Firestore 'packages' collection)
@@ -465,27 +627,52 @@ export const firestoreEngine = {
     },
 
     // 12. Package Purchase Requests (Source of Truth: Firestore 'package_requests' collection)
+    // Uniqueness of the UTR is enforced by the document id, not by scanning.
+    //
+    // The old version read every purchase request and looked for a duplicate in
+    // JavaScript. That was racy (two submissions of the same UTR a moment apart
+    // both saw "no duplicate"), it cost a full collection read per submission,
+    // and under owner-scoped rules a student cannot list that collection at all.
+    // Deriving the id from the UTR means a second submission is refused by
+    // Firestore itself: the rules allow `create` but not `update`, so writing to
+    // an id that already exists is denied atomically.
     savePackagePurchaseRequest: async (requestData) => {
         const cleanUtr = String(requestData.utrNumber || '').trim();
-        const existingReqs = await firestoreEngine.getPackagePurchaseRequests();
-        const duplicate = existingReqs.find(r => r.utrNumber === cleanUtr && r.status !== 'rejected');
-        
-        if (duplicate) {
-            return {
-                success: false,
-                message: `UTR number ${cleanUtr} has already been submitted and processed. Duplicate UTR submissions are not allowed.`
-            };
+        if (!cleanUtr) {
+            return { success: false, message: 'A UTR / transaction reference number is required.' };
         }
 
         if (isFirebaseConnected && db) {
+            const reqId = 'utr_' + cleanUtr;
+            const normalized = {
+                ...requestData,
+                id: reqId,
+                utrNumber: cleanUtr,
+                status: 'pending',
+                createdAt: new Date().toISOString()
+            };
+
             try {
-                const reqId = requestData.id || ('req_' + Date.now());
-                const normalized = { ...requestData, id: reqId, createdAt: new Date().toISOString() };
                 const reqRef = doc(db, 'package_requests', reqId);
+                const existing = await getDoc(reqRef);
+                if (existing.exists() && existing.data().status !== 'rejected') {
+                    return {
+                        success: false,
+                        message: `UTR number ${cleanUtr} has already been submitted. Duplicate UTR submissions are not allowed.`
+                    };
+                }
+
                 await setDoc(reqRef, normalized);
-                console.log('[Firestore Engine] Saved package purchase request to Cloud Firestore:', reqId);
                 return { success: true, request: normalized };
             } catch (err) {
+                // A denied write here is the uniqueness constraint doing its
+                // job on a concurrent duplicate, not an unexpected failure.
+                if (err.code === 'permission-denied') {
+                    return {
+                        success: false,
+                        message: `UTR number ${cleanUtr} has already been submitted. Duplicate UTR submissions are not allowed.`
+                    };
+                }
                 console.error('[Firestore Engine] Error saving package purchase request:', err.message);
                 throw err;
             }
@@ -513,9 +700,18 @@ export const firestoreEngine = {
 
     // 13. Approve Package Purchase Request (Credits Package & Test Quota in Firestore)
     approvePackagePurchaseRequest: async (requestId) => {
-        const requests = await firestoreEngine.getPackagePurchaseRequests();
-        const req = requests.find(r => r.id === requestId);
-        if (!req) return { success: false, message: 'Request not found.' };
+        if (!isFirebaseConnected || !db) throw new Error('Firestore database is not connected.');
+
+        // Direct document read — this used to pull the whole collection and
+        // scan it in JavaScript to find one known id.
+        const reqSnap = await getDoc(doc(db, 'package_requests', requestId));
+        if (!reqSnap.exists()) return { success: false, message: 'Request not found.' };
+        const req = { id: reqSnap.id, ...reqSnap.data() };
+
+        if (req.status === 'approved') {
+            // Approving twice would credit the quota twice.
+            return { success: false, message: 'This request has already been approved.' };
+        }
 
         const updatedReq = { ...req, status: 'approved', approvedAt: new Date().toISOString() };
 
@@ -608,105 +804,50 @@ export const firestoreEngine = {
         return data;
     },
 
-    // 14a-ii. Verify a completed Razorpay payment server-side
-    // (/api/razorpay/verify-payment checks the HMAC signature using the
-    // Key Secret, which never reaches the browser) — only a genuine
-    // Razorpay-signed payment reaches this point. Crediting itself then
-    // happens client-side via processRazorpayPaymentSuccess below, same
-    // code path as the "simulate payment" test button. Deliberately kept
-    // simple (no Firebase Admin SDK, no webhook) to match this app's
-    // actual risk profile.
-    verifyRazorpayPayment: async ({ orderId, paymentId, signature, student, pkg, amount }) => {
+    // 14a-ii. Verify a completed Razorpay payment and credit the quota.
+    //
+    // Both now happen inside /api/razorpay/verify-payment, which is the only
+    // place with the Key Secret and the Admin SDK. This function deliberately
+    // sends no price, no quota and no uid: the server takes the buyer from the
+    // Firebase ID token, the price and quota from the package document, and
+    // the amount actually paid from the Razorpay API. Anything this browser
+    // claims about those is ignored.
+    verifyRazorpayPayment: async ({ orderId, paymentId, signature, packageId }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) {
+            return { success: false, error: 'Your session has expired. Please sign in again before paying.' };
+        }
+
         const res = await fetch('/api/razorpay/verify-payment', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId, paymentId, signature })
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${idToken}`
+            },
+            body: JSON.stringify({ orderId, paymentId, signature, packageId })
         });
         const data = await res.json();
 
-        if (!data.verified) {
-            return { success: false, error: data.error || 'Payment verification failed.' };
+        if (!res.ok || !data.success) {
+            return { success: false, error: data?.error || 'Payment verification failed.' };
         }
 
-        return firestoreEngine.processRazorpayPaymentSuccess({ student, pkg, paymentId, amount });
+        return {
+            success: true,
+            alreadyCredited: !!data.alreadyCredited,
+            creditedTests: data.creditedTests,
+            message: data.message
+        };
     },
 
-    // 14b. Process Instant Razorpay Payment Success & Credit Student Quota
-    // Used both by the "Simulate Instant Quota Credit" test button and, via
-    // verifyRazorpayPayment above, by real payments after the server has
-    // confirmed the Razorpay signature is genuine.
-    processRazorpayPaymentSuccess: async ({ student, pkg, paymentId, amount }) => {
-        const studentId = student.uid || student.id;
-        const profile = await firestoreEngine.getUserProfile(studentId);
-        const currentRemaining = Number(profile?.remainingTests || student.remainingTests || 0);
-        const currentAllowed = Number(profile?.allowedTests || student.allowedTests || 0);
-        const addedQuota = Number(pkg.totalTests || 10);
-
-        const newPurchasedPackage = {
-            id: 'pkg_purch_' + Date.now(),
-            packageId: pkg.id,
-            examId: pkg.examId || null,
-            packageName: pkg.name,
-            exam: pkg.exam,
-            totalTests: addedQuota,
-            amountPaid: amount || pkg.discountPrice || pkg.price,
-            paymentMethod: 'Razorpay',
-            paymentReference: paymentId,
-            paymentStatus: 'COMPLETED',
-            purchaseDate: new Date().toISOString()
-        };
-
-        const updatedStudent = {
-            ...(profile || student),
-            uid: studentId,
-            id: studentId,
-            remainingTests: currentRemaining + addedQuota,
-            allowedTests: currentAllowed + addedQuota,
-            purchasedPackages: [...((profile?.purchasedPackages || student.purchasedPackages) || []), newPurchasedPackage],
-            updatedAt: new Date().toISOString()
-        };
-
-        const requestData = {
-            id: 'req_rzp_' + Date.now(),
-            studentId: studentId,
-            studentName: student.name,
-            studentEmail: student.email,
-            studentMobile: student.mobile || '9876543210',
-            packageId: pkg.id,
-            packageName: pkg.name,
-            targetExam: pkg.exam,
-            testQuota: addedQuota,
-            amount: amount || pkg.discountPrice || pkg.price,
-            paymentMethod: 'Razorpay',
-            utrNumber: paymentId,
-            razorpayPaymentId: paymentId,
-            status: 'approved',
-            createdAt: new Date().toISOString(),
-            approvedAt: new Date().toISOString()
-        };
-
-        if (isFirebaseConnected && db) {
-            try {
-                await setDoc(doc(db, 'users', studentId), updatedStudent, { merge: true });
-                await setDoc(doc(db, 'package_requests', requestData.id), requestData);
-
-                const currUser = storageService.getCurrentUser();
-                if (currUser && (currUser.id === studentId || currUser.uid === studentId)) {
-                    storageService.setCurrentUser(updatedStudent);
-                }
-
-                return {
-                    success: true,
-                    user: updatedStudent,
-                    message: `Payment Successful! ${addedQuota} Tests credited instantly to your account.`
-                };
-            } catch (e) {
-                console.error('[Firestore Engine] Razorpay Firestore credit error:', e.message);
-                throw e;
-            }
-        }
-        throw new Error('Firestore database is not connected.');
-    },
+    // 14b. Quota crediting used to live here as processRazorpayPaymentSuccess,
+    // called by the browser after the server said the signature was valid.
+    // That made the signature check decorative: nothing stopped a student
+    // invoking it directly, and the Firestore rules let any signed-in user
+    // write any user document anyway. It now happens inside
+    // /api/razorpay/verify-payment with the Admin SDK, in the same
+    // transaction as the idempotency marker. There is deliberately no
+    // client-side path that can grant quota.
 
     // 15. Admin Merchant Payment Settings (Source of Truth: Firestore 'settings/payment' document)
     getMerchantPaymentSettings: async () => {

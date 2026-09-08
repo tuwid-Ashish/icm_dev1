@@ -45,11 +45,15 @@ export const ExamPaperGenerator = () => {
     useEffect(() => {
         (async () => {
             setLoading(true);
-            const loaded = await firestoreEngine.getQuestions('ALL');
-            setQuestions(loaded);
+            const [loadedQ] = await Promise.all([
+                firestoreEngine.getQuestions('ALL'),
+                firestoreEngine.getSubjectCodes()
+            ]);
+            setQuestions(loadedQ || []);
             setLoading(false);
         })();
     }, []);
+
 
     const availableSubjects = useMemo(() => {
         const set = new Set();
@@ -102,10 +106,14 @@ export const ExamPaperGenerator = () => {
         });
     }, [questions, selectedBatches, selectedSubjects, questionTypeFilter]);
 
-    // Whenever candidateQuestions changes from new Firestore fetch, default to selecting all
+    // Seed the picker with everything once the question bank loads.
+    // Keyed on the loaded bank, NOT on candidateQuestions — candidateQuestions
+    // is recomputed on every batch/subject/type filter change, so depending on
+    // it wiped the admin's hand-picked selection each time they touched a
+    // filter, which is the one thing the filters exist to support.
     useEffect(() => {
-        setSelectedIds(new Set(candidateQuestions.map(q => q.id)));
-    }, [candidateQuestions]);
+        setSelectedIds(new Set(questions.map(q => q.id)));
+    }, [questions]);
 
     const toggleQuestionSelected = (id) => {
         setSelectedIds(prev => {

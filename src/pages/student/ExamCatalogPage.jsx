@@ -159,8 +159,8 @@ export const ExamCatalogPage = () => {
                                                 {e.subjects.map((s, idx) => {
                                                     const sylTopic = syllabus[idx]?.topics || 'Comprehensive section questions matching official blueprint';
                                                     return (
-                                                        <tr key={s.id || s.name || idx}>
-                                                            <td><strong>{s.name}</strong></td>
+                                                        <tr key={(s.subjectCode || s.name) ?? idx}>
+                                                            <td><strong>{resolveSubjectCode(s.subjectCode || s.name).name}</strong></td>
                                                             <td>{s.questionsCount} {t('questions_label')}</td>
                                                             <td><strong>{(s.questionsCount || 0) * (s.marksPerQuestion || 1)} {t('marks_unit')}</strong></td>
                                                             <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{sylTopic}</td>
@@ -218,9 +218,17 @@ export const ExamCatalogPage = () => {
                                 onChange={e => setSelectedSubject(e.target.value)}
                             >
                                 <option value="ALL">{t('all_subjects_mixed')}</option>
-                                {selectedExam.subjects && selectedExam.subjects.map(s => (
-                                    <option key={s.id || s.name} value={s.name}>{resolveSubjectCode(s.name).name} ({selectedExam.totalQuestions || 20} {t('qs_unit')} Practice)</option>
-                                ))}
+                                {/* The value is the subject CODE — it is passed straight to
+                                    the paper generator as the subject filter. `s.name` is the
+                                    pre-migration field that also held a code. */}
+                                {selectedExam.subjects && selectedExam.subjects.map(s => {
+                                    const subjectCode = s.subjectCode || s.name;
+                                    return (
+                                        <option key={subjectCode} value={subjectCode}>
+                                            {resolveSubjectCode(subjectCode).name} ({selectedExam.totalQuestions || 20} {t('qs_unit')} Practice)
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     )}

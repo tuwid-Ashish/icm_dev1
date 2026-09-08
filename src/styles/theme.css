@@ -399,20 +399,28 @@ body {
     }
 
     .top-navbar-main {
-        padding: 0.5rem 0.85rem !important;
-        min-height: 56px !important;
+        padding: 0.55rem 0.95rem !important;
+        min-height: 64px !important;
         flex-wrap: nowrap;
     }
 
+    .brand-group {
+        gap: 0.65rem !important;
+    }
+
     .brand-logo-text {
-        font-size: 1.15rem !important;
+        font-size: 1.45rem !important;
+        font-weight: 900 !important;
+        letter-spacing: -0.3px !important;
         white-space: nowrap;
     }
 
     .brand-logo-badge {
-        width: 40px;
-        height: 40px;
+        width: 52px !important;
+        height: 52px !important;
+        padding: 2px !important;
     }
+
 }
 
 @media (max-width: 1100px) {

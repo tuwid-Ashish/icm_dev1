@@ -166,9 +166,16 @@ export const FreeTestsPage = () => {
                                 onChange={e => setSelectedSubject(e.target.value)}
                             >
                                 <option value="ALL">{t('all_subjects_mixed')}</option>
-                                {selectedExam.subjects && selectedExam.subjects.map(s => (
-                                    <option key={s.id || s.name} value={s.name}>{resolveSubjectCode(s.name).name} ({selectedExam.totalQuestions || 20} {t('qs_unit')} Practice)</option>
-                                ))}
+                                {/* Value is the subject CODE — passed straight to the paper
+                                    generator as the subject filter. */}
+                                {selectedExam.subjects && selectedExam.subjects.map(s => {
+                                    const subjectCode = s.subjectCode || s.name;
+                                    return (
+                                        <option key={subjectCode} value={subjectCode}>
+                                            {resolveSubjectCode(subjectCode).name} ({selectedExam.totalQuestions || 20} {t('qs_unit')} Practice)
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                     )}

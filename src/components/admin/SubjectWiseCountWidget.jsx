@@ -1,8 +1,21 @@
-import React, { useState } from 'react';
-import { SUBJECT_CODES, resolveSubjectCode } from '../../constants/subjectCodes.js';
+import React, { useState, useEffect } from 'react';
+import { DEFAULT_SUBJECT_CODES, resolveSubjectCode, getCachedSubjectCodes } from '../../constants/subjectCodes.js';
+import { firestoreEngine } from '../../services/firestoreEngine.js';
 
-export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, selectedSubject = 'ALL' }) => {
+export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, selectedSubject = 'ALL', customSubjectCodes = null }) => {
     const [selectedBatch, setSelectedBatch] = useState('ALL');
+    const [activeSubjectCodes, setActiveSubjectCodes] = useState(customSubjectCodes || getCachedSubjectCodes() || DEFAULT_SUBJECT_CODES);
+
+    useEffect(() => {
+        if (customSubjectCodes && customSubjectCodes.length > 0) {
+            setActiveSubjectCodes(customSubjectCodes);
+        } else {
+            (async () => {
+                const loaded = await firestoreEngine.getSubjectCodes();
+                if (loaded && loaded.length > 0) setActiveSubjectCodes(loaded);
+            })();
+        }
+    }, [customSubjectCodes]);
 
     // Filter questions by selected batch if specified
     const filteredQuestions = selectedBatch === 'ALL' 
@@ -15,15 +28,15 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
             return b.includes('ALL') || b.includes(selectedBatch);
         });
 
-    // Compute counts per subject code (M1 .. M9 and OTHER)
+    // Compute counts per subject code (M1 .. M9, M10, M11 and OTHER)
     const countsByCode = {};
-    SUBJECT_CODES.forEach(s => {
+    activeSubjectCodes.forEach(s => {
         countsByCode[s.code] = 0;
     });
     countsByCode['OTHER'] = 0;
 
     filteredQuestions.forEach(q => {
-        const resolved = resolveSubjectCode(q.subjectCode || q.subject);
+        const resolved = resolveSubjectCode(q.subjectCode || q.subject, activeSubjectCodes);
         const code = resolved ? resolved.code : 'OTHER';
         if (countsByCode[code] !== undefined) {
             countsByCode[code]++;
@@ -34,19 +47,6 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
 
     const totalCount = filteredQuestions.length;
 
-    // Color accents for each subject badge
-    const badgeColors = {
-        M1: { bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.3)', text: '#3b82f6' }, // Blue - Maths
-        M2: { bg: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.3)', text: '#ea580c' },  // Orange - Marathi
-        M3: { bg: 'rgba(168, 85, 247, 0.12)', border: 'rgba(168, 85, 247, 0.3)', text: '#a855f7' }, // Purple - Reasoning
-        M4: { bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.3)', text: '#10b981' }, // Green - GK 1
-        M5: { bg: 'rgba(20, 184, 166, 0.12)', border: 'rgba(20, 184, 166, 0.3)', text: '#14b8a6' }, // Teal - GK 2
-        M6: { bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)', text: '#f59e0b' }, // Amber - GS 1
-        M7: { bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.3)', text: '#ef4444' },   // Red - GS 2
-        M8: { bg: 'rgba(236, 72, 153, 0.12)', border: 'rgba(236, 72, 153, 0.3)', text: '#ec4899' }, // Pink - Hindi
-        M9: { bg: 'rgba(99, 102, 241, 0.12)', border: 'rgba(99, 102, 241, 0.3)', text: '#6366f1' }, // Indigo - English
-        OTHER: { bg: 'rgba(100, 116, 139, 0.12)', border: 'rgba(100, 116, 139, 0.3)', text: '#64748b' }
-    };
 
     return (
         <div style={{
@@ -133,11 +133,11 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
                     </div>
                 </div>
 
-                {/* M1 through M9 Cards */}
-                {SUBJECT_CODES.map((s) => {
+                {/* Dynamic Subject Cards (M1 to M9, M10, M11...) */}
+                {activeSubjectCodes.map((s) => {
                     const count = countsByCode[s.code] || 0;
                     const percent = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
-                    const colors = badgeColors[s.code] || badgeColors.OTHER;
+                    const cardColor = s.color || '#3b82f6';
                     const isSelected = selectedSubject === s.code;
 
                     return (
@@ -146,20 +146,20 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
                             onClick={() => onSelectSubject && onSelectSubject(isSelected ? 'ALL' : s.code)}
                             title={`Click to filter by ${s.code} - ${s.name}`}
                             style={{
-                                background: isSelected ? colors.bg : 'var(--bg-subtle)',
-                                border: isSelected ? `2px solid ${colors.text}` : `1px solid ${colors.border}`,
+                                background: isSelected ? `${cardColor}18` : 'var(--bg-subtle)',
+                                border: isSelected ? `2px solid ${cardColor}` : `1px solid ${cardColor}40`,
                                 borderRadius: 'var(--radius-md)',
                                 padding: '0.75rem 0.6rem',
                                 textAlign: 'center',
                                 cursor: onSelectSubject ? 'pointer' : 'default',
                                 transition: 'all 0.15s ease',
                                 position: 'relative',
-                                boxShadow: isSelected ? `0 2px 8px ${colors.border}` : 'none'
+                                boxShadow: isSelected ? `0 2px 8px ${cardColor}33` : 'none'
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
                                 <span style={{
-                                    background: colors.text,
+                                    background: cardColor,
                                     color: '#ffffff',
                                     fontWeight: 800,
                                     fontSize: '0.72rem',
@@ -173,7 +173,7 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
                                 </span>
                             </div>
 
-                            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: count > 0 ? colors.text : 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: count > 0 ? cardColor : 'var(--text-muted)' }}>
                                 {count}
                             </div>
 
@@ -183,7 +183,7 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
 
                             {/* Mini progress bar indicator */}
                             <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', borderRadius: '2px', marginTop: '0.4rem', overflow: 'hidden' }}>
-                                <div style={{ width: `${percent}%`, height: '100%', background: colors.text }}></div>
+                                <div style={{ width: `${percent}%`, height: '100%', background: cardColor }}></div>
                             </div>
                         </div>
                     );
@@ -194,22 +194,23 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
                     <div 
                         onClick={() => onSelectSubject && onSelectSubject(selectedSubject === 'OTHER' ? 'ALL' : 'OTHER')}
                         style={{
-                            background: selectedSubject === 'OTHER' ? badgeColors.OTHER.bg : 'var(--bg-subtle)',
-                            border: selectedSubject === 'OTHER' ? `2px solid ${badgeColors.OTHER.text}` : `1px solid ${badgeColors.OTHER.border}`,
+                            background: selectedSubject === 'OTHER' ? 'rgba(100, 116, 139, 0.18)' : 'var(--bg-subtle)',
+                            border: selectedSubject === 'OTHER' ? '2px solid #64748b' : '1px solid rgba(100, 116, 139, 0.4)',
                             borderRadius: 'var(--radius-md)',
                             padding: '0.75rem 0.6rem',
                             textAlign: 'center',
                             cursor: onSelectSubject ? 'pointer' : 'default'
                         }}
                     >
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: badgeColors.OTHER.text }}>OTHER</span>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: badgeColors.OTHER.text }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>OTHER</span>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#64748b' }}>
                             {countsByCode['OTHER']}
                         </div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Custom Subjects</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Custom / Unmapped</div>
                     </div>
                 )}
             </div>
         </div>
     );
 };
+

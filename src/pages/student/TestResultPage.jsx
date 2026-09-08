@@ -5,17 +5,29 @@ import { MathRenderer } from '../../components/common/MathRenderer.jsx';
 
 export const TestResultPage = ({ result, onBack }) => {
     const { t } = useLanguage();
-    const [allSubmissions, setAllSubmissions] = useState([]);
+    // Rank and top-10 are computed by /api/leaderboard now. The page used to
+    // pull the entire test_attempts collection into the browser to do this,
+    // which handed every student every other student's uid, email and full
+    // answer review. The server returns names and scores only.
+    const [board, setBoard] = useState(null);
     const [loadingRank, setLoadingRank] = useState(true);
     const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
         async function loadLeaderboard() {
+            if (!result) return;
             setLoadingRank(true);
-            const subs = await firestoreEngine.getSubmissions();
+            const data = await firestoreEngine.getExamLeaderboard({
+                examId: result.examId,
+                attemptId: result.id,
+                finalScore: result.finalScore,
+                timeTakenSeconds: result.timeTakenSeconds,
+                totalMarks: result.totalMarks,
+                accuracy: result.accuracy
+            });
             if (isMounted) {
-                setAllSubmissions(subs);
+                setBoard(data);
                 setLoadingRank(false);
             }
         }
@@ -25,29 +37,10 @@ export const TestResultPage = ({ result, onBack }) => {
 
     if (!result) return null;
 
-    // Filter submissions for this specific exam/test
-    const examSubs = allSubmissions.filter(s => s.examId === result.examId || (s.examName && s.examName.includes(result.examName || '')));
-
-    // If current result isn't in Firestore list yet, append it transiently for rank math
-    const combinedList = [...examSubs];
-    if (!combinedList.some(s => s.id === result.id || (s.studentId === result.studentId && s.submittedAt === result.submittedAt))) {
-        combinedList.push(result);
-    }
-
-    // Sort by finalScore desc, timeTakenSeconds asc
-    combinedList.sort((a, b) => {
-        if ((b.finalScore || 0) !== (a.finalScore || 0)) return (b.finalScore || 0) - (a.finalScore || 0);
-        return (a.timeTakenSeconds || 0) - (b.timeTakenSeconds || 0);
-    });
-
-    // Determine current student's rank position
-    const userRankIdx = combinedList.findIndex(s => s.id === result.id || (s.studentId === result.studentId && s.submittedAt === result.submittedAt && s.finalScore === result.finalScore));
-    const userRank = userRankIdx !== -1 ? userRankIdx + 1 : 1;
-    const totalCandidates = combinedList.length;
-    const topperScore = combinedList.length > 0 ? (combinedList[0].finalScore || 0) : result.finalScore;
-
-    // Top Rankers List for Modal
-    const topRankers = combinedList.slice(0, 10);
+    const userRank = board?.userRank ?? 1;
+    const totalCandidates = board?.totalCandidates ?? 1;
+    const topperScore = board?.topperScore ?? result.finalScore;
+    const topRankers = board?.topRankers ?? [];
 
     const getRankBadge = (idx) => {
         if (idx === 0) return '🥇 #1';
@@ -246,15 +239,15 @@ export const TestResultPage = ({ result, onBack }) => {
                                 </thead>
                                 <tbody>
                                     {topRankers.map((item, idx) => (
-                                        <tr key={item.id || idx} style={{ background: item.id === result.id ? 'rgba(168, 85, 247, 0.15)' : 'transparent' }}>
+                                        <tr key={idx} style={{ background: item.isYou ? 'rgba(168, 85, 247, 0.15)' : 'transparent' }}>
                                             <td>
                                                 <strong style={{ fontSize: '1.1rem', color: idx === 0 ? '#eab308' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : 'var(--text-primary)' }}>
                                                     {getRankBadge(idx)}
                                                 </strong>
                                             </td>
                                             <td>
-                                                <strong>{item.studentName || item.studentEmail?.split('@')[0] || 'Student User'}</strong>
-                                                {item.id === result.id && <span className="badge badge-success" style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>You</span>}
+                                                <strong>{item.name || 'Student User'}</strong>
+                                                {item.isYou && <span className="badge badge-success" style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>You</span>}
                                             </td>
                                             <td><strong>{item.finalScore} / {item.totalMarks || result.totalMarks}</strong></td>
                                             <td>{item.accuracy}%</td>

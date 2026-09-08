@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { parseCSVQuestions } from '../../services/csvParserService.js';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../common/Modal.jsx';
-import { SUBJECT_CODES } from '../../constants/subjectCodes.js';
+import { DEFAULT_SUBJECT_CODES, getCachedSubjectCodes } from '../../constants/subjectCodes.js';
 
 export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
     const [rawText, setRawText] = useState('');
@@ -11,6 +11,17 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
     const [parsedPreview, setParsedPreview] = useState(null);
     const [validationError, setValidationError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [subjectCodes, setSubjectCodes] = useState(getCachedSubjectCodes() || DEFAULT_SUBJECT_CODES);
+
+    useEffect(() => {
+        if (isOpen) {
+            (async () => {
+                const loaded = await firestoreEngine.getSubjectCodes();
+                if (loaded && loaded.length > 0) setSubjectCodes(loaded);
+            })();
+        }
+    }, [isOpen]);
+
 
     // Resets all local state before handing control back to the parent —
     // otherwise Cancel (or the modal's own ✕) leaves the preview/error/file
@@ -61,8 +72,21 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
 
     if (!isOpen) return null;
 
+    // Rows whose Subject column matched no code in the subject master. Subject
+    // resolution is exact now, so these would import as OTHER and effectively
+    // disappear — no blueprint section draws from OTHER. Import is blocked
+    // until they are corrected in the CSV.
+    const unresolvedRows = (parsedPreview || []).filter(q => q.subjectResolved === false);
+
     const handleConfirmImport = async () => {
         if (!parsedPreview || parsedPreview.length === 0) return;
+        if (unresolvedRows.length > 0) {
+            setValidationError(
+                `${unresolvedRows.length} row(s) have a Subject that does not match any subject code. ` +
+                `Fix them in your CSV, or add the missing code under "Subject Codes", then re-parse.`
+            );
+            return;
+        }
 
         setIsParsing(true);
         setValidationError('');
@@ -106,10 +130,12 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                             {isParsing ? 'Validating CSV...' : 'Parse & Validate CSV'}
                         </button>
                     ) : (
-                        <button type="button" className="btn btn-primary" onClick={handleConfirmImport} disabled={isParsing}>
-                            {isParsing 
-                                ? `Importing (${importProgress.current}/${importProgress.total || parsedPreview.length})...` 
-                                : `Confirm & Save ${parsedPreview.length} Questions`}
+                        <button type="button" className="btn btn-primary" onClick={handleConfirmImport} disabled={isParsing || unresolvedRows.length > 0}>
+                            {isParsing
+                                ? `Importing (${importProgress.current}/${importProgress.total || parsedPreview.length})...`
+                                : unresolvedRows.length > 0
+                                    ? `Fix ${unresolvedRows.length} unrecognized subject${unresolvedRows.length === 1 ? '' : 's'} first`
+                                    : `Confirm & Save ${parsedPreview.length} Questions`}
                         </button>
                     )}
                 </>
@@ -125,6 +151,25 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
             {successMessage && (
                 <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', color: 'var(--success)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
                     {successMessage}
+                </div>
+            )}
+
+            {unresolvedRows.length > 0 && (
+                <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.4rem' }}>
+                        {unresolvedRows.length} row{unresolvedRows.length === 1 ? '' : 's'} have an unrecognized Subject — nothing will be imported until these are fixed.
+                    </strong>
+                    <div style={{ fontWeight: 400, marginBottom: '0.5rem' }}>
+                        These would be filed under OTHER, which no exam blueprint draws from, so the questions
+                        would never appear in a paper. Use a subject code (M1, M2, …), or add the missing code
+                        under the "Subject Codes" tab first.
+                    </div>
+                    <div style={{ maxHeight: '110px', overflowY: 'auto', fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                        {unresolvedRows.slice(0, 20).map((q, i) => (
+                            <div key={i}>row {q.rowNumber}: &ldquo;{q.rawSubject || '(empty)'}&rdquo;</div>
+                        ))}
+                        {unresolvedRows.length > 20 && <div>… and {unresolvedRows.length - 20} more</div>}
+                    </div>
                 </div>
             )}
 
@@ -164,12 +209,13 @@ export const BulkUploadModal = ({ isOpen, onClose, onRefresh }) => {
                         <br />
                         <strong>Multiple batches for one question?</strong> Separate them with a semicolon inside the batch cell — e.g. <code>Police Bharti;SSC GD</code> (not a comma, since commas already separate CSV columns).
                         <br />
-                        <strong>Subject column:</strong> use the fixed subject code below (not the subject name) to avoid spelling mismatches — a recognizable name still works as a fallback.
+                        <strong>Subject column:</strong> use one of the subject codes below. The exact subject name or one of its saved aliases also works, but partial matches do not — &ldquo;Elementary Mathematics&rdquo; is not recognized, &ldquo;M1&rdquo; is. Unrecognized rows are listed and block the import rather than being filed under OTHER.
                         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-                            {SUBJECT_CODES.map(s => (
+                            {subjectCodes.map(s => (
                                 <span key={s.code} className="badge badge-purple" style={{ fontSize: '0.72rem' }}>{s.code} = {s.name}</span>
                             ))}
                         </div>
+
                     </div>
                 </div>
             ) : (

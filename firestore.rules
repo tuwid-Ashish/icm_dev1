@@ -1,30 +1,137 @@
 rules_version = '2';
+
+// Every previous rule was `if request.auth != null` — "any signed-in user may
+// read and write anything". That let any student set their own remainingTests,
+// forge a purchase, promote themselves to admin, post a scorecard they never
+// sat, and read every other student's email, mobile and answers.
+//
+// Two ideas carry the whole file:
+//   1. Admin is a signed custom claim (scripts/grantAdminClaim.js), never a
+//      field the client can write.
+//   2. Anything worth money — quota, role, purchases — is writable only by the
+//      server (Admin SDK bypasses these rules), never by the browser.
+//
+// Note for future edits: rules are NOT filters. A collection read fails
+// entirely if a single matched document is denied, so any client listing a
+// collection must query the subset it is allowed to see.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null;
+
+    function isSignedIn() {
+      return request.auth != null;
     }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Fields a student must never be able to change on their own profile.
+    // Anything touching money, entitlement or privilege lives here; the server
+    // writes them with the Admin SDK, which is not subject to these rules.
+    function protectedProfileFieldsUnchanged() {
+      return request.resource.data.role == resource.data.role
+          && request.resource.data.allowedTests == resource.data.allowedTests
+          && request.resource.data.remainingTests == resource.data.remainingTests
+          && request.resource.data.completedTests == resource.data.completedTests
+          && request.resource.data.purchasedPackages == resource.data.purchasedPackages
+          && request.resource.data.freeTestAttempts == resource.data.freeTestAttempts;
+    }
+
+    // ---- Users -----------------------------------------------------------
+    // Own profile only. A student may edit their name/mobile; quota, role and
+    // purchases are immutable from here. Admins may read and write any profile.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Signup creates the profile. Force role 'student' and zero quota so a
+      // new account cannot be born an admin or pre-loaded with tests.
+      allow create: if isOwner(userId)
+                    && request.resource.data.role == 'student'
+                    && request.resource.data.get('allowedTests', 0) == 0
+                    && request.resource.data.get('remainingTests', 0) == 0;
+
+      allow update: if isAdmin()
+                    || (isOwner(userId) && protectedProfileFieldsUnchanged());
+
+      allow delete: if isAdmin();
+    }
+
+    // ---- Test attempts ---------------------------------------------------
+    // A student may create and read their own attempts, and nothing else.
+    // Scoring stays client-side by product decision (unproctored practice
+    // exams), so a determined student can post a flattering scorecard for
+    // themselves — but they can no longer read or alter anyone else's.
+    // Ranking is served by /api/leaderboard, which returns names and scores
+    // only, so no client needs to list this collection.
+    match /test_attempts/{attemptId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.studentId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---- Purchase requests (manual UPI) ----------------------------------
+    // A student may raise their own request and see it. Only an admin can
+    // approve one — approval is what grants quota.
+    match /package_requests/{requestId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.studentId == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.studentId == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    // ---- Razorpay idempotency markers ------------------------------------
+    // Written only by /api/razorpay/verify-payment via the Admin SDK. If the
+    // browser could create these it could block its own future credits, and
+    // if it could delete them it could replay a payment for free quota.
+    match /payments/{paymentId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---- Catalog content -------------------------------------------------
+    // Public read: the landing page and catalog are browsable signed-out.
+    // Writes are admin-only — these used to be writable by any signed-in user,
+    // which meant a student could edit or delete the question bank.
     match /exams/{examId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
+
     match /questions/{questionId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
-    match /test_attempts/{attemptId} {
-      allow read, write: if request.auth != null;
-    }
+
     match /packages/{packageId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
+
+    // Subject master (M1, M2, ... M10). This block was missing entirely, so
+    // default-deny applied: the client could neither read the collection nor
+    // run its own first-load seed, which is why subject_codes never existed
+    // and adding one code appeared to erase the other nine.
+    match /subject_codes/{codeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /settings/{docId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
-    match /package_requests/{requestId} {
-      allow read, write: if request.auth != null;
-    }
+
+    // Anything not matched above is denied. Adding a collection means adding
+    // a block here — the failure mode that hid the subject_codes bug for
+    // weeks was a silent permission-denied swallowed by a catch.
   }
 }

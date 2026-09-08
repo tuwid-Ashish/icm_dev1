@@ -3,6 +3,15 @@ import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../common/Modal.jsx';
 import { EXAM_BATCHES } from '../../constants/examBatches.js';
 
+// A blueprint row names its subject by CODE, chosen from subject_codes —
+// same contract as ExamConfigList. This used to be a free-text box, which is
+// what forced examEngine to fuzzy-match blueprint text against question data.
+const blueprintRow = (subjectCode, questionsCount = 5) => ({
+    subjectCode,
+    questionsCount,
+    marksPerQuestion: 1
+});
+
 // Dedicated admin surface for free-test exams — kept separate from
 // ExamConfigList (paid exam blueprints) per client requirement: free tests
 // "should not come under exam test." Same underlying `exams` collection
@@ -24,18 +33,31 @@ export const FreeTestManager = ({ onRefresh }) => {
     const [freeAttemptLimit, setFreeAttemptLimit] = useState(1);
     const [questionBatch, setQuestionBatch] = useState(EXAM_BATCHES[0]);
 
+    const [subjectCodes, setSubjectCodes] = useState([]);
+    const [availability, setAvailability] = useState({});
     const [subjectBreakdown, setSubjectBreakdown] = useState([
-        { name: 'Mathematics', questionsCount: 5, marksPerQuestion: 1 },
-        { name: 'Reasoning Ability', questionsCount: 5, marksPerQuestion: 1 },
-        { name: 'General Knowledge', questionsCount: 5, marksPerQuestion: 1 },
-        { name: 'Marathi Language', questionsCount: 5, marksPerQuestion: 1 }
+        blueprintRow('M1'), blueprintRow('M3'), blueprintRow('M6'), blueprintRow('M2')
     ]);
 
     const loadExams = async () => {
         setLoading(true);
-        const examList = await firestoreEngine.getExams();
+        const [examList, codes] = await Promise.all([
+            firestoreEngine.getExams(),
+            firestoreEngine.getSubjectCodes()
+        ]);
         setExams(examList.filter(e => e.isFreeTest));
+        setSubjectCodes(codes || []);
         setLoading(false);
+
+        // Live per-subject availability, so a blueprint asking for more than
+        // the bank holds is visible here instead of at exam time.
+        const counts = await firestoreEngine.getQuestionCountsBySubject((codes || []).map(c => c.code));
+        setAvailability(counts);
+    };
+
+    const labelForCode = (codeValue) => {
+        const hit = subjectCodes.find(s => s.code === codeValue);
+        return hit ? `${hit.code} — ${hit.name}` : codeValue;
     };
 
     useEffect(() => {
@@ -55,14 +77,14 @@ export const FreeTestManager = ({ onRefresh }) => {
             setQuestionBatch(exam.questionBatch || EXAM_BATCHES[0]);
 
             if (exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0) {
-                setSubjectBreakdown(exam.subjects.map(s => ({ ...s, marksPerQuestion: s.marksPerQuestion || 1 })));
+                // `s.name` is the pre-migration field, which also held the code.
+                setSubjectBreakdown(exam.subjects.map(s => ({
+                    subjectCode: s.subjectCode || s.name || '',
+                    questionsCount: parseInt(s.questionsCount, 10) || 0,
+                    marksPerQuestion: s.marksPerQuestion || 1
+                })));
             } else {
-                setSubjectBreakdown([
-                    { name: 'Mathematics', questionsCount: 5, marksPerQuestion: 1 },
-                    { name: 'Reasoning Ability', questionsCount: 5, marksPerQuestion: 1 },
-                    { name: 'General Knowledge', questionsCount: 5, marksPerQuestion: 1 },
-                    { name: 'Marathi Language', questionsCount: 5, marksPerQuestion: 1 }
-                ]);
+                setSubjectBreakdown([blueprintRow('M1'), blueprintRow('M3'), blueprintRow('M6'), blueprintRow('M2')]);
             }
         } else {
             setCode('FREE-TEST-2026');
@@ -73,24 +95,25 @@ export const FreeTestManager = ({ onRefresh }) => {
             setMinQualifyingPercent(40);
             setFreeAttemptLimit(1);
             setQuestionBatch(EXAM_BATCHES[0]);
-            setSubjectBreakdown([
-                { name: 'Mathematics', questionsCount: 5, marksPerQuestion: 1 },
-                { name: 'Reasoning Ability', questionsCount: 5, marksPerQuestion: 1 },
-                { name: 'General Knowledge', questionsCount: 5, marksPerQuestion: 1 },
-                { name: 'Marathi Language', questionsCount: 5, marksPerQuestion: 1 }
-            ]);
+            setSubjectBreakdown([blueprintRow('M1'), blueprintRow('M3'), blueprintRow('M6'), blueprintRow('M2')]);
         }
         setModalOpen(true);
     };
 
     const handleSubjectChange = (index, field, value) => {
-        const updated = [...subjectBreakdown];
-        updated[index][field] = (field === 'questionsCount' || field === 'marksPerQuestion') ? parseFloat(value) || 0 : value;
+        // Copy the edited row rather than mutating the object held in state.
+        const updated = subjectBreakdown.map((row, i) => (
+            i === index
+                ? { ...row, [field]: (field === 'questionsCount' || field === 'marksPerQuestion') ? parseFloat(value) || 0 : value }
+                : row
+        ));
         setSubjectBreakdown(updated);
     };
 
     const handleAddSubject = () => {
-        setSubjectBreakdown([...subjectBreakdown, { name: 'New Subject', questionsCount: 5, marksPerQuestion: 1 }]);
+        const used = new Set(subjectBreakdown.map(s => s.subjectCode));
+        const nextCode = (subjectCodes.find(s => !used.has(s.code)) || subjectCodes[0])?.code || '';
+        setSubjectBreakdown([...subjectBreakdown, blueprintRow(nextCode)]);
     };
 
     const handleRemoveSubject = (index) => {
@@ -99,11 +122,23 @@ export const FreeTestManager = ({ onRefresh }) => {
     };
 
     const calculatedTotalQuestions = subjectBreakdown.reduce((sum, s) => sum + (s.questionsCount || 0), 0);
+    // A subject whose count could not be read is assumed available, so a failed
+    // lookup never fabricates a shortfall warning.
+    const deliverableTotal = subjectBreakdown.reduce((sum, s) => {
+        const have = availability[s.subjectCode];
+        const want = s.questionsCount || 0;
+        return sum + (have === undefined ? want : Math.min(want, have));
+    }, 0);
     const calculatedTotalMarks = subjectBreakdown.reduce((sum, s) => sum + (s.questionsCount || 0) * (s.marksPerQuestion || 1), 0);
 
     const handleSave = async (e) => {
         e.preventDefault();
-        const examId = editingExam ? editingExam.id : code.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        // Opaque, permanent id — never derived from the display code. Slugifying
+        // the code is what produced mh_police_2026 for an exam whose real id was
+        // pb, stranding the purchases that referenced it.
+        const examId = editingExam
+            ? editingExam.id
+            : 'exam_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
         const examData = {
             id: examId,
@@ -178,7 +213,7 @@ export const FreeTestManager = ({ onRefresh }) => {
                                     <td style={{ maxWidth: '320px' }}>
                                         <strong>{e.totalQuestions} Questions Total</strong><br />
                                         <small style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                                            {e.subjects ? e.subjects.map(s => `${s.name}: ${s.questionsCount}`).join(' | ') : 'General Distribution'}
+                                            {e.subjects ? e.subjects.map(s => `${labelForCode(s.subjectCode || s.name)}: ${s.questionsCount}`).join(' | ') : 'General Distribution'}
                                         </small>
                                     </td>
                                     <td><strong>{e.totalMarks} Marks</strong></td>
@@ -283,16 +318,36 @@ export const FreeTestManager = ({ onRefresh }) => {
                         <span></span>
                     </div>
 
-                    {subjectBreakdown.map((sb, idx) => (
+                    {subjectBreakdown.map((sb, idx) => {
+                        // undefined = count unreadable; 0 = genuinely none.
+                        const have = availability[sb.subjectCode];
+                        const want = sb.questionsCount || 0;
+                        const isShort = have !== undefined && want > have;
+                        return (
                         <div key={idx} className="subject-row-grid">
-                            <input
-                                type="text"
-                                className="form-control"
-                                required
-                                value={sb.name}
-                                onChange={e => handleSubjectChange(idx, 'name', e.target.value)}
-                                placeholder="Subject Name (e.g. Mathematics)"
-                            />
+                            <div style={{ minWidth: 0 }}>
+                                <select
+                                    className="form-control"
+                                    required
+                                    value={sb.subjectCode || ''}
+                                    onChange={e => handleSubjectChange(idx, 'subjectCode', e.target.value)}
+                                >
+                                    <option value="" disabled>Select subject…</option>
+                                    {subjectCodes.map(s => (
+                                        <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                                    ))}
+                                    {sb.subjectCode && !subjectCodes.some(s => s.code === sb.subjectCode) && (
+                                        <option value={sb.subjectCode}>{sb.subjectCode} — (unknown code)</option>
+                                    )}
+                                </select>
+                                <small style={{ display: 'block', marginTop: '0.25rem', fontSize: '0.72rem', fontWeight: isShort ? 700 : 400, color: isShort ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                    {have === undefined
+                                        ? 'availability unknown'
+                                        : isShort
+                                            ? `only ${have} available — short by ${want - have}`
+                                            : `${have} available`}
+                                </small>
+                            </div>
                             <input
                                 type="number"
                                 className="form-control"
@@ -326,7 +381,18 @@ export const FreeTestManager = ({ onRefresh }) => {
                                 ✕
                             </button>
                         </div>
-                    ))}
+                        );
+                    })}
+
+                    {deliverableTotal < calculatedTotalQuestions && (
+                        <div style={{ marginTop: '0.85rem', background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem' }}>
+                            <strong>This paper cannot be filled.</strong> The question bank can supply{' '}
+                            {deliverableTotal} of the {calculatedTotalQuestions} questions configured — students would
+                            sit a paper {calculatedTotalQuestions - deliverableTotal} question
+                            {calculatedTotalQuestions - deliverableTotal === 1 ? '' : 's'} short. Add questions for the
+                            subjects marked above, or lower their counts.
+                        </div>
+                    )}
 
                     <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 800 }}>
                         <span>Total Calculated Exam Questions:</span>

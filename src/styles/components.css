@@ -936,7 +936,8 @@ textarea.form-control { resize: vertical; min-height: 100px; }
     }
 
     .top-navbar .brand-logo-text {
-        font-size: 1.15rem !important;
+        font-size: 1.45rem !important;
+        font-weight: 900 !important;
     }
 }
 
@@ -963,34 +964,78 @@ textarea.form-control { resize: vertical; min-height: 100px; }
 }
 
 @media print {
-    body * {
-        visibility: hidden;
-    }
-    .exam-paper-print-area,
-    .exam-paper-print-area * {
-        visibility: visible;
-    }
-    .exam-paper-print-area {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100% !important;
-        max-width: none !important;
+    html, body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        height: auto !important;
+        min-height: auto !important;
         margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    /* Completely collapse all non-printable layout elements to 0px */
+    .no-print,
+    .top-navbar-wrapper,
+    .navbar,
+    .sidebar,
+    .scrollable-tabs-bar,
+    .mobile-menu-panel,
+    header,
+    nav,
+    footer {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    /* Flatten all parent layout containers so they add 0 top margin/padding */
+    .container,
+    .app-container,
+    .main-content,
+    .page-wrapper,
+    main {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    /* Print Area - Natural Flow (Multi-Page pagination support) */
+    .exam-paper-print-area {
+        position: static !important;
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
         border: none !important;
         border-radius: 0 !important;
         box-shadow: none !important;
-        background: #fff !important;
-        padding: 4mm 2mm !important;
-        box-sizing: border-box !important;
+        background: #ffffff !important;
+        overflow: visible !important;
     }
-    .no-print {
-        display: none !important;
+
+    .exam-paper-header {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        margin-bottom: 1rem !important;
     }
+
     .exam-paper-question {
-        page-break-inside: avoid;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+        margin-bottom: 0.85rem !important;
+        display: block !important;
     }
+
     @page {
-        margin: 6mm;
+        margin: 10mm 8mm;
+        size: auto;
     }
 }
+

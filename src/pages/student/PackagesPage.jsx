@@ -6,7 +6,7 @@ import { PackagePurchaseModal } from '../../components/student/PackagePurchaseMo
 import { DashboardShell } from '../../layouts/DashboardShell.jsx';
 
 export const PackagesPage = () => {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const { t } = useLanguage();
     const [packages, setPackages] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
@@ -28,6 +28,16 @@ export const PackagesPage = () => {
     };
 
     useEffect(() => { loadData(); }, [user]);
+
+    // Quota is credited by /api/razorpay/verify-payment now, so the cached
+    // auth user is stale the moment a purchase completes — the client-side
+    // credit helper used to refresh that cache as a side effect and nothing
+    // does any more. refreshUser() replaces the user object, which re-runs
+    // the effect above, so this must NOT live inside loadData itself.
+    const handlePurchaseSuccess = async () => {
+        if (refreshUser) await refreshUser();
+        else await loadData();
+    };
 
     const handleOpenPurchase = (pkg) => {
         setSelectedPkg(pkg);
@@ -96,7 +106,7 @@ export const PackagesPage = () => {
                 pkg={selectedPkg}
                 isOpen={purchaseModalOpen}
                 onClose={() => setPurchaseModalOpen(false)}
-                onSuccess={loadData}
+                onSuccess={handlePurchaseSuccess}
             />
         </DashboardShell>
     );

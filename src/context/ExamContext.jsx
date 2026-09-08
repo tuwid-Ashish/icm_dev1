@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { generateExamPaper, evaluateSubmission } from '../services/examEngine.js';
 import { firestoreEngine } from '../services/firestoreEngine.js';
+import { storageService } from '../services/storageService.js';
 import { useAuth } from './AuthContext.jsx';
 
 const ExamContext = createContext(null);

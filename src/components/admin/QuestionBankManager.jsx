@@ -6,12 +6,13 @@ import { MathRenderer } from '../common/MathRenderer.jsx';
 import { MathExpressionEditor } from '../common/MathExpressionEditor.jsx';
 import { MathToolbar } from './MathToolbar.jsx';
 import { looksLikeMathContent } from '../../utils/mathContent.js';
-import { SUBJECT_CODES, resolveSubjectCode } from '../../constants/subjectCodes.js';
+import { DEFAULT_SUBJECT_CODES, resolveSubjectCode, getCachedSubjectCodes } from '../../constants/subjectCodes.js';
 import { SubjectWiseCountWidget } from './SubjectWiseCountWidget.jsx';
 
 
 export const QuestionBankManager = ({ onRefresh }) => {
     const [questions, setQuestions] = useState([]);
+    const [subjectCodes, setSubjectCodes] = useState(getCachedSubjectCodes() || DEFAULT_SUBJECT_CODES);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [batchFilter, setBatchFilter] = useState('ALL');
@@ -58,18 +59,18 @@ export const QuestionBankManager = ({ onRefresh }) => {
     const [marks, setMarks] = useState(1);
     const [explanation, setExplanation] = useState('');
 
-    // Explicit authoring mode — never inferred from Subject (a Mathematics-subject
-    // question can still be plain text, and other subjects can contain equations).
+    // Explicit authoring mode — never inferred from Subject
     const [questionType, setQuestionType] = useState('standard');
-    // Tracks whichever MathLive mathfield last had focus, across every
-    // MathExpressionEditor instance in the modal, so the shared toolbar
-    // knows where to insert structure.
     const activeMathFieldRef = useRef(null);
 
     const loadQuestions = async () => {
         setLoading(true);
-        const loaded = await firestoreEngine.getQuestions(batchFilter);
-        setQuestions(loaded);
+        const [loadedQ, loadedSub] = await Promise.all([
+            firestoreEngine.getQuestions(batchFilter),
+            firestoreEngine.getSubjectCodes()
+        ]);
+        setQuestions(loadedQ || []);
+        if (loadedSub && loadedSub.length > 0) setSubjectCodes(loadedSub);
         setLoading(false);
     };
 
@@ -80,7 +81,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
     let filtered = questions;
     if (subjectFilter !== 'ALL') {
         filtered = filtered.filter(item => {
-            const resolved = resolveSubjectCode(item.subjectCode || item.subject);
+            const resolved = resolveSubjectCode(item.subjectCode || item.subject, subjectCodes);
             return (resolved && resolved.code === subjectFilter) || item.subjectCode === subjectFilter;
         });
     }
@@ -95,7 +96,6 @@ export const QuestionBankManager = ({ onRefresh }) => {
         );
     }
 
-
     const handleOpenEditModal = (q = null) => {
         setEditingQ(q);
         if (q) {
@@ -107,7 +107,8 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 setIsAllBatches(false);
                 setSelectedBatches(batchesArr);
             }
-            setQSubjectCode(q.subjectCode || resolveSubjectCode(q.subject).code);
+            setQSubjectCode(q.subjectCode || resolveSubjectCode(q.subject, subjectCodes).code);
+
             setQText(q.text || '');
             setQTextMr(q.text_mr || '');
             setImageUrl(q.imageUrl || (q.questionImages && q.questionImages[0]?.url) || '');
@@ -166,7 +167,12 @@ export const QuestionBankManager = ({ onRefresh }) => {
         const batchesToSave = isAllBatches ? ['ALL'] : selectedBatches;
         const batchDisplayString = isAllBatches ? 'All Batches' : selectedBatches.join(', ');
 
-        const subjectEntry = SUBJECT_CODES.find(s => s.code === qSubjectCode);
+        // Resolve against the subject codes this component actually loaded
+        // (Firestore-backed, so admin-created codes like M10 work), not the
+        // hardcoded M1-M9 array — which was also never imported here, so this
+        // line threw a ReferenceError before the try block below and silently
+        // killed every manual question save.
+        const subjectEntry = subjectCodes.find(s => s.code === qSubjectCode);
 
         const questionData = {
             id: editingQ ? editingQ.id : 'Q-' + Date.now(),
@@ -219,11 +225,12 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 </div>
             </div>
 
-            {/* 📊 Subject-Wise Question Count Window (M1 - M9 Matrix) */}
+            {/* 📊 Subject-Wise Question Count Window (Dynamic Subject Matrix) */}
             <SubjectWiseCountWidget 
                 questions={questions} 
                 selectedSubject={subjectFilter} 
                 onSelectSubject={setSubjectFilter} 
+                customSubjectCodes={subjectCodes}
             />
 
             {/* Filter Bar */}
@@ -243,12 +250,13 @@ export const QuestionBankManager = ({ onRefresh }) => {
                     onChange={e => setSubjectFilter(e.target.value)}
                     style={{ flex: 1, minWidth: '180px' }}
                 >
-                    <option value="ALL">All Subjects (M1–M9)</option>
-                    {SUBJECT_CODES.map(s => (
+                    <option value="ALL">All Subjects ({subjectCodes.length} Registered)</option>
+                    {subjectCodes.map(s => (
                         <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
                     ))}
                     <option value="OTHER">Other / Custom Subjects</option>
                 </select>
+
 
                 <select 
                     className="form-control" 
@@ -407,11 +415,12 @@ export const QuestionBankManager = ({ onRefresh }) => {
                         <div className="form-group">
                             <label className="form-label">Subject</label>
                             <select className="form-control" required value={qSubjectCode} onChange={e => setQSubjectCode(e.target.value)}>
-                                {SUBJECT_CODES.map(s => (
+                                {subjectCodes.map(s => (
                                     <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
                                 ))}
                             </select>
                         </div>
+
 
                         {questionType === 'mathematical' && (
                             <MathToolbar activeMathFieldRef={activeMathFieldRef} />

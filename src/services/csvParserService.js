@@ -121,6 +121,11 @@ export function parseCSVQuestions(csvText) {
 
         const batches = parseBatchCell(rawBatch);
         const resolvedSubject = resolveSubjectCode(rawSubject);
+        // Subject resolution is exact now (see resolveSubjectCode). A value the
+        // registry does not recognise is carried through as unresolved so the
+        // import preview can show it and refuse, rather than filing the question
+        // under OTHER where nobody would ever find it again.
+        const subjectResolved = resolvedSubject.resolved === true;
 
         // Preserve uploaded explanation if present, otherwise default gracefully
         const finalExplanation = rawExp && rawExp.trim() ? rawExp.trim() : `Correct option is ${ansLetter}`;
@@ -131,6 +136,9 @@ export function parseCSVQuestions(csvText) {
             batch: batches.join(', '),
             subjectCode: resolvedSubject.code,
             subject: resolvedSubject.name,
+            rawSubject: rawSubject || '',
+            subjectResolved,
+            rowNumber: i + 1,
             text: qText || '',
             text_mr: rawTextMr || '',
             options: [optA || '', optB || '', optC || '', optD || ''],

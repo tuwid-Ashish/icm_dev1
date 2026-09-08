@@ -75,7 +75,32 @@ class StorageService {
         if (typeof localStorage === 'undefined') return [];
         return JSON.parse(localStorage.getItem('cep_react_offline_questions') || '[]');
     }
+
+    // --- OFFLINE SUBJECT CODES CACHE ---
+    saveSubjectCodeOffline(subjectData) {
+        if (typeof localStorage === 'undefined') return;
+        const key = 'cep_react_offline_subject_codes';
+        const codes = JSON.parse(localStorage.getItem(key) || '[]');
+        const idx = codes.findIndex(s => s.code === subjectData.code || s.id === subjectData.id);
+        if (idx !== -1) codes[idx] = subjectData;
+        else codes.push(subjectData);
+        localStorage.setItem(key, JSON.stringify(codes));
+    }
+
+    getSubjectCodesOffline() {
+        if (typeof localStorage === 'undefined') return [];
+        return JSON.parse(localStorage.getItem('cep_react_offline_subject_codes') || '[]');
+    }
+
+    deleteSubjectCodeOffline(code) {
+        if (typeof localStorage === 'undefined') return;
+        const key = 'cep_react_offline_subject_codes';
+        let codes = JSON.parse(localStorage.getItem(key) || '[]');
+        codes = codes.filter(s => s.code !== code && s.id !== code);
+        localStorage.setItem(key, JSON.stringify(codes));
+    }
 }
 
 export const storageService = new StorageService();
+
 

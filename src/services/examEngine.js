@@ -23,33 +23,28 @@ class ExamEngine {
     }
 
     /**
-     * Matches a question against a blueprint subject using code, name, or canonical aliases.
+     * Does this question belong to this blueprint section? Subject code
+     * equality, and nothing else.
+     *
+     * This used to end in a substring fallback:
+     *     qSub === bpSub || qSub.includes(bpSub) || bpSub.includes(qSub)
+     * which existed only because the blueprint stored free text ("General
+     * Knowledge & Current Affairs") that had to be reconciled with a coded
+     * question. Blueprints store `subjectCode` now, so the reconciliation is
+     * unnecessary — and the substring rule was a standing hazard: a subject
+     * named "GK" would have matched both "GK 1" and "GK 2", quietly pooling
+     * two sections together.
+     *
+     * Verified safe by scripts/compareSubjectMatching.js: on the live bank the
+     * strict rule produces an identical pool for all 9 codes.
+     *
+     * `subjectFilter` from the student UI is also a code — see the subject
+     * pickers in ExamCatalogPage / FreeTestsPage.
      */
-    isQuestionMatchingSubject(q, bpSubjectName) {
-        if (!q || !bpSubjectName) return false;
-        
-        const bpResolved = resolveSubjectCode(bpSubjectName);
-        const qResolved = resolveSubjectCode(q.subjectCode || q.subject);
-
-        // 1. Direct Subject Code Matching (e.g. 'M1' === 'M1')
-        if (bpResolved.code !== 'OTHER' && qResolved.code !== 'OTHER' && bpResolved.code === qResolved.code) {
-            return true;
-        }
-
-        // 2. Direct Code Comparison (e.g. q.subjectCode === 'M1' or bpSubjectName === 'M1')
-        const bpCode = bpSubjectName.trim().toUpperCase();
-        const qCode = (q.subjectCode || qResolved.code || '').trim().toUpperCase();
-        if (bpCode === qCode && bpCode.startsWith('M')) {
-            return true;
-        }
-
-        // 3. String & Alias Matching
-        const qSub = (q.subject || qResolved.name || '').toLowerCase();
-        const bpSub = String(bpSubjectName || '').toLowerCase();
-
-        if (qSub === bpSub || qSub.includes(bpSub) || bpSub.includes(qSub)) return true;
-
-        return false;
+    isQuestionMatchingSubject(q, blueprintSubjectCode) {
+        if (!q || !blueprintSubjectCode) return false;
+        return String(q.subjectCode || '').trim().toUpperCase()
+            === String(blueprintSubjectCode).trim().toUpperCase();
     }
 
     async generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20, studentInfo = {}) {
@@ -94,6 +89,9 @@ class ExamEngine {
         }
 
         let generatedQuestions = [];
+        // Sections the question bank could not fill. Reported on the session
+        // rather than thrown, so a thin paper still runs but is never silent.
+        const shortfalls = [];
 
         // 🌟 2. Blueprint-Driven Subject Selection Engine
         // Strictly obeys the Exam Blueprint configuration configured in the Admin Section (exam.subjects).
@@ -104,26 +102,54 @@ class ExamEngine {
 
         if (subjectFilter === 'ALL' && blueprintSubjects) {
             const totalBlueprintQuestions = blueprintSubjects.reduce((sum, s) => sum + (parseInt(s.questionsCount, 10) || 0), 0);
-            const targetTotalCount = Math.min(exam.totalQuestions || totalBlueprintQuestions || 20, 100);
+            // No hard ceiling. This was Math.min(..., 100), which did not just
+            // cap the total — it fed scaleRatio below, silently shrinking every
+            // section in proportion. An exam configured for 120 (4 x 30) served
+            // 100 as 4 x 25, with nothing anywhere saying so. The admin's
+            // configured total is authoritative.
+            const targetTotalCount = exam.totalQuestions || totalBlueprintQuestions || 20;
             const scaleRatio = totalBlueprintQuestions > 0 ? (targetTotalCount / totalBlueprintQuestions) : 1;
 
             blueprintSubjects.forEach(s => {
+                // `s.name` is the pre-migration field, which held the code too —
+                // read it as a fallback so an unmigrated blueprint still works.
+                // See scripts/migrateBlueprintSubjectCodes.js.
+                const blueprintCode = s.subjectCode || s.name;
                 const wantedCount = Math.max(1, Math.round((parseInt(s.questionsCount, 10) || 1) * scaleRatio));
-                const subjPool = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, s.name));
+                const subjPool = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, blueprintCode));
                 const shuffledSubjPool = this.fisherYatesShuffle(subjPool);
 
-                const picked = shuffledSubjPool.slice(0, Math.min(wantedCount, shuffledSubjPool.length)).map(q => ({
+                const sectionLabel = resolveSubjectCode(blueprintCode).name || blueprintCode;
+                const takeCount = Math.min(wantedCount, shuffledSubjPool.length);
+
+                // The blueprint asked for more questions than this subject has.
+                // Previously the Math.min above just took whatever existed and
+                // moved on, and the only guard was "did the WHOLE paper come
+                // back empty" — so a 100-question exam could ship 58 with no
+                // indication anywhere. Record it so callers can report it.
+                if (takeCount < wantedCount) {
+                    shortfalls.push({
+                        subjectCode: blueprintCode,
+                        subjectName: sectionLabel,
+                        wanted: wantedCount,
+                        available: shuffledSubjPool.length
+                    });
+                }
+
+                const picked = shuffledSubjPool.slice(0, takeCount).map(q => ({
                     ...q,
-                    sectionId: s.id || s.name,
-                    sectionName: s.name,
+                    sectionId: blueprintCode,
+                    sectionName: sectionLabel,
                     marks: s.marksPerQuestion || q.marks || 1
                 }));
 
                 generatedQuestions.push(...picked);
             });
         } else if (subjectFilter !== 'ALL') {
-            const sfLower = subjectFilter.toLowerCase();
-            const matched = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, sfLower));
+            // subjectFilter is a subject CODE. It used to be lower-cased here
+            // because the match was a case-insensitive substring test; it is a
+            // code comparison now, so pass it through untouched.
+            const matched = batchQuestions.filter(q => this.isQuestionMatchingSubject(q, subjectFilter));
             const shuffled = this.fisherYatesShuffle(matched);
             // Single Subject Practice generates full test question count (e.g. 20 questions) for that subject
             const targetCount = exam.totalQuestions || parseInt(count, 10) || 20;
@@ -175,6 +201,11 @@ class ExamEngine {
             examCode: exam.code,
             durationMinutes: subjectFilter !== 'ALL' ? Math.max(10, Math.ceil(generatedQuestions.length * 1.0)) : exam.durationMinutes,
             negativeMarkingRate: exam.negativeMarkingRate,
+            // What the blueprint asked for vs what the bank could supply.
+            // requestedQuestions is only meaningful for a full blueprint paper;
+            // single-subject practice is sized by what exists by design.
+            requestedQuestions: subjectFilter === 'ALL' ? (exam.totalQuestions || generatedQuestions.length) : generatedQuestions.length,
+            shortfalls,
             totalMarks: generatedQuestions.reduce((sum, q) => sum + (q.marks || 1), 0),
             questions: generatedQuestions,
             userAnswers: {},

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StudentTable } from '../../components/admin/StudentTable.jsx';
 import { QuestionBankManager } from '../../components/admin/QuestionBankManager.jsx';
+import { SubjectCodeManager } from '../../components/admin/SubjectCodeManager.jsx';
 import { ExamConfigList } from '../../components/admin/ExamConfigList.jsx';
 import { FreeTestManager } from '../../components/admin/FreeTestManager.jsx';
 import { PackageManager } from '../../components/admin/PackageManager.jsx';
@@ -12,31 +13,38 @@ import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export const AdminDashboardPage = () => {
     const { t } = useLanguage();
-    // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'exams' | 'reports' | 'exam_paper'
+    // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'subject_codes' | 'exams' | 'free_tests' | 'reports' | 'exam_paper'
     const [activeTab, setActiveTab] = useState('overview');
     const [questions, setQuestions] = useState([]);
+    const [subjectCodes, setSubjectCodes] = useState([]);
     const [stats, setStats] = useState({
         totalStudents: 0,
         totalQuestions: 0,
         totalExams: 0,
         totalPackages: 0,
-        totalSubmissions: 0
+        totalSubmissions: 0,
+        totalSubjects: 0
     });
 
     const loadStats = async () => {
-        const qList = await firestoreEngine.getQuestions('ALL');
-        const eList = await firestoreEngine.getExams();
-        const sList = await firestoreEngine.getSubmissions();
-        const pkgList = await firestoreEngine.getPackages();
-        const stdList = await firestoreEngine.getStudents();
+        const [qList, eList, sList, pkgList, stdList, subList] = await Promise.all([
+            firestoreEngine.getQuestions('ALL'),
+            firestoreEngine.getExams(),
+            firestoreEngine.getSubmissions(),
+            firestoreEngine.getPackages(),
+            firestoreEngine.getStudents(),
+            firestoreEngine.getSubjectCodes()
+        ]);
 
-        setQuestions(qList);
+        setQuestions(qList || []);
+        setSubjectCodes(subList || []);
         setStats({
-            totalStudents: stdList.length,
-            totalQuestions: qList.length,
-            totalExams: eList.length,
-            totalPackages: pkgList.length,
-            totalSubmissions: sList.length
+            totalStudents: (stdList || []).length,
+            totalQuestions: (qList || []).length,
+            totalExams: (eList || []).length,
+            totalPackages: (pkgList || []).length,
+            totalSubmissions: (sList || []).length,
+            totalSubjects: (subList || []).length
         });
     };
 
@@ -48,7 +56,7 @@ export const AdminDashboardPage = () => {
     return (
         <div>
             {/* Admin Header */}
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div className="no-print" style={{ marginBottom: '1.5rem' }}>
                 <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '2.2rem', fontWeight: 800 }}>
                     {t('admin_panel_title')}
                 </h1>
@@ -58,7 +66,7 @@ export const AdminDashboardPage = () => {
             </div>
 
             {/* Navigation Tabs Bar */}
-            <div className="scrollable-tabs-bar">
+            <div className="scrollable-tabs-bar no-print">
                 <button 
                     className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('overview')}
@@ -82,6 +90,12 @@ export const AdminDashboardPage = () => {
                     onClick={() => setActiveTab('questions')}
                 >
                     {t('tab_questions')}
+                </button>
+                <button 
+                    className={`btn ${activeTab === 'subject_codes' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('subject_codes')}
+                >
+                    {t('tab_subject_codes')}
                 </button>
                 <button
                     className={`btn ${activeTab === 'exams' ? 'btn-primary' : 'btn-secondary'}`}
@@ -181,10 +195,12 @@ export const AdminDashboardPage = () => {
             {activeTab === 'students' && <StudentTable onRefresh={loadStats} />}
             {activeTab === 'packages' && <PackageManager onRefresh={loadStats} />}
             {activeTab === 'questions' && <QuestionBankManager onRefresh={loadStats} />}
+            {activeTab === 'subject_codes' && <SubjectCodeManager onRefresh={loadStats} />}
             {activeTab === 'exams' && <ExamConfigList />}
             {activeTab === 'free_tests' && <FreeTestManager onRefresh={loadStats} />}
             {activeTab === 'reports' && <SystemReportsPage />}
             {activeTab === 'exam_paper' && <ExamPaperGenerator />}
+
         </div>
     );
 };
