@@ -7,13 +7,10 @@ import { Modal } from '../common/Modal.jsx';
 export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     const { user } = useAuth();
     const { t } = useLanguage();
-    const [utrNumber, setUtrNumber] = useState('');
-    const [senderUpi, setSenderUpi] = useState(user?.mobile ? `${user.mobile}@ybl` : '');
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [successPaymentId, setSuccessPaymentId] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
-    const [paymentMethodTab, setPaymentMethodTab] = useState('razorpay'); // 'razorpay' | 'manual_utr'
 
     const [paymentConfig, setPaymentConfig] = useState({
         merchantName: 'SigmaForce CEP Official',
@@ -54,7 +51,6 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     if (!isOpen || !pkg) return null;
 
     const amountToPay = pkg.discountPrice || pkg.price;
-    const qrSource = paymentConfig.qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi://pay?pa=${encodeURIComponent(paymentConfig.upiId)}%26pn=${encodeURIComponent(paymentConfig.merchantName)}%26cu=INR`;
 
     // Trigger Official Razorpay Gateway Popup — order is created server-side
     // (/api/razorpay/create-order) so the Key Secret never touches the browser,
@@ -168,54 +164,6 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     //     }
     // };
 
-    const handleManualUtrSubmit = async (e) => {
-        e.preventDefault();
-        const trimmedUtr = utrNumber.trim();
-        if (trimmedUtr.length !== 12 || !/^\d{12}$/.test(trimmedUtr)) {
-            setErrorMessage('Please enter a valid 12-digit numeric UPI UTR / Transaction Reference Number.');
-            return;
-        }
-
-        if (!senderUpi.trim()) {
-            setErrorMessage('Please enter your Sender UPI ID or Mobile Number.');
-            return;
-        }
-
-        setLoading(true);
-        setErrorMessage('');
-
-        const requestData = {
-            id: 'req_' + Date.now(),
-            studentId: user?.id || user?.uid || 'std_101',
-            studentName: user?.name || 'Alex Student',
-            studentEmail: user?.email || 'student@sigma.com',
-            studentMobile: user?.mobile || '9876543210',
-            packageId: pkg.id,
-            packageName: pkg.name,
-            targetExam: pkg.exam,
-            testQuota: pkg.totalTests,
-            amount: amountToPay,
-            utrNumber: trimmedUtr,
-            senderUpi: senderUpi.trim(),
-            status: 'pending',
-            createdAt: new Date().toISOString()
-        };
-
-        const res = await firestoreEngine.savePackagePurchaseRequest(requestData);
-        setLoading(false);
-
-        if (!res.success) {
-            setErrorMessage(res.message || 'Error submitting purchase request.');
-            return;
-        }
-
-        setSuccessMessage('Payment submission received! Your 12-digit UTR has been sent to Admin for verification.');
-        
-        setTimeout(() => {
-            if (onSuccess) onSuccess();
-            onClose();
-        }, 2500);
-    };
 
     return (
         <Modal
@@ -252,51 +200,15 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                         </div>
                     </div>
 
-                    {/* Payment Method Switcher Tabs */}
-                    {/* <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', background: 'var(--bg-subtle)', padding: '0.35rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                        <button
-                            type="button"
-                            onClick={() => setPaymentMethodTab('razorpay')}
-                            style={{
-                                flex: 1,
-                                padding: '0.6rem',
-                                border: 'none',
-                                borderRadius: 'var(--radius-sm)',
-                                fontWeight: 800,
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                background: paymentMethodTab === 'razorpay' ? 'var(--primary)' : 'transparent',
-                                color: paymentMethodTab === 'razorpay' ? '#ffffff' : 'var(--text-muted)'
-                            }}
-                        >
-                            💳 Razorpay Instant Gateway
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setPaymentMethodTab('manual_utr')}
-                            style={{
-                                flex: 1,
-                                padding: '0.6rem',
-                                border: 'none',
-                                borderRadius: 'var(--radius-sm)',
-                                fontWeight: 800,
-                                fontSize: '0.85rem',
-                                cursor: 'pointer',
-                                background: paymentMethodTab === 'manual_utr' ? 'var(--primary)' : 'transparent',
-                                color: paymentMethodTab === 'manual_utr' ? '#ffffff' : 'var(--text-muted)'
-                            }}
-                        >
-                            📲 Manual QR & UTR
-                        </button>
-                    </div> */}
-
                     {errorMessage && (
                         <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
                             {errorMessage}
                         </div>
                     )}
 
-                    {paymentMethodTab === 'razorpay' ? (
+                    {/* Razorpay is the only checkout route. The manual UPI QR + UTR
+                        flow was removed from the UI; firestoreEngine.savePackagePurchaseRequest
+                        and the admin approval queue remain for historical requests. */}
                         <div style={{ border: '2px solid var(--primary-border)', background: 'var(--bg-surface)', padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
                             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔒</div>
                             <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
@@ -319,74 +231,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                                     <span>⚡ {t('pay_via_razorpay_btn')} (₹{amountToPay})</span>
                                 )}
                             </button>
-
-                            {/* <button
-                                type="button"
-                                className="btn btn-secondary"
-                                disabled={loading}
-                                onClick={handleSimulatedPayment}
-                                style={{ width: '100%', marginTop: '0.65rem', padding: '0.65rem', fontSize: '0.85rem', fontWeight: 700 }}
-                            >
-                                🧪 Test Mode: Simulate Instant Quota Credit (Without Key)
-                            </button> */}
                         </div>
-                    ) : (
-                        <form onSubmit={handleManualUtrSubmit}>
-                            {/* UPI QR Code & Merchant Details Box */}
-                            <div style={{ border: '2px dashed var(--primary-border)', background: 'var(--bg-surface)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', textAlign: 'center', marginBottom: '1.25rem' }}>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--primary)', letterSpacing: '0.5px', marginBottom: '0.75rem' }}>
-                                    Scan Merchant UPI QR Code
-                                </div>
-
-                                <div style={{ width: '180px', height: '180px', margin: '0 auto 0.75rem', background: '#ffffff', padding: '0.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <img 
-                                        src={qrSource}
-                                        alt="Official Merchant UPI QR Code"
-                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                    />
-                                </div>
-
-                                <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-                                    {paymentConfig.merchantName}
-                                </div>
-                                <div style={{ fontSize: '0.85rem', marginTop: '0.25rem', wordBreak: 'break-all' }}>
-                                    Merchant UPI ID: <code style={{ background: 'var(--bg-subtle)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontWeight: 800, color: 'var(--primary)', wordBreak: 'break-all' }}>{paymentConfig.upiId}</code>
-                                </div>
-                            </div>
-
-                            <div style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-                                <div className="form-group">
-                                    <label className="form-label">12-Digit UPI UTR / Transaction Ref No *</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-control" 
-                                        required 
-                                        maxLength="12"
-                                        value={utrNumber} 
-                                        onChange={e => setUtrNumber(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="e.g. 422198034120" 
-                                        style={{ fontFamily: 'monospace', letterSpacing: '1px', fontSize: '1rem' }}
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label className="form-label">Your Sender UPI ID / Mobile *</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-control" 
-                                        required 
-                                        value={senderUpi} 
-                                        onChange={e => setSenderUpi(e.target.value)}
-                                        placeholder="e.g. 9876543210@ybl" 
-                                    />
-                                </div>
-
-                                <button type="submit" className="btn btn-primary" disabled={loading} style={{ width: '100%', marginTop: '0.5rem' }}>
-                                    {loading ? 'Submitting UTR...' : 'Submit Payment UTR for Verification'}
-                                </button>
-                            </div>
-                        </form>
-                    )}
                 </>
             )}
         </Modal>

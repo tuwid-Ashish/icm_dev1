@@ -653,20 +653,21 @@ export const firestoreEngine = {
             };
 
             try {
-                const reqRef = doc(db, 'package_requests', reqId);
-                const existing = await getDoc(reqRef);
-                if (existing.exists() && existing.data().status !== 'rejected') {
-                    return {
-                        success: false,
-                        message: `UTR number ${cleanUtr} has already been submitted. Duplicate UTR submissions are not allowed.`
-                    };
-                }
-
-                await setDoc(reqRef, normalized);
+                // Write straight at the UTR-keyed document — no read first.
+                //
+                // The security rules already enforce uniqueness: a student may
+                // `create` this document but not `update` it, so a setDoc lands
+                // only when the UTR has never been used. Reading first was
+                // actively wrong under those rules — a get() on a document that
+                // does NOT exist is denied (the read rule dereferences
+                // resource.data, which is null), and the handler below treats
+                // permission-denied as "duplicate". Every genuine first-time
+                // submission would have been rejected as a duplicate.
+                await setDoc(doc(db, 'package_requests', reqId), normalized);
                 return { success: true, request: normalized };
             } catch (err) {
                 // A denied write here is the uniqueness constraint doing its
-                // job on a concurrent duplicate, not an unexpected failure.
+                // job: the document already exists, so this was an update.
                 if (err.code === 'permission-denied') {
                     return {
                         success: false,

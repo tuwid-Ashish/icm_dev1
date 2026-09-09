@@ -49,28 +49,37 @@ export const ExamProvider = ({ children }) => {
         });
     };
 
-    // Live countdown timer effect with auto-submit at 0
+    // Live countdown timer with auto-submit at 0.
+    //
+    // Keyed on the session ID, not the session object. `activeSession` is
+    // replaced on every answer, palette change and navigation, so depending on
+    // it tore down and recreated this interval on each interaction — throwing
+    // away the partially elapsed tick every time. A student clicking quickly
+    // gained real time, and timeTakenSeconds on the scorecard was wrong.
+    // The id changes only when a genuinely different test starts, which is the
+    // only moment the clock should restart.
+    const activeSessionId = activeSession?.id || null;
     useEffect(() => {
-        let interval = null;
-        if (activeSession && timerSeconds > 0) {
-            interval = setInterval(() => {
-                setTimerSeconds((prev) => {
-                    if (prev <= 1) {
-                        clearInterval(interval);
-                        // Auto submit test using latest ref
-                        submitCurrentTest();
-                        return 0;
-                    }
-                    const nextSecs = prev - 1;
-                    localStorage.setItem('sigma_timer_seconds', nextSecs.toString());
-                    return nextSecs;
-                });
-            }, 1000);
-        }
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [activeSession]);
+        if (!activeSessionId) return undefined;
+
+        const interval = setInterval(() => {
+            setTimerSeconds((prev) => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    // Reads the live session/timer through refs, so the stale
+                    // closure over this render's values does not matter.
+                    submitCurrentTest();
+                    return 0;
+                }
+                const nextSecs = prev - 1;
+                localStorage.setItem('sigma_timer_seconds', nextSecs.toString());
+                return nextSecs;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeSessionId]);
 
     // Save current question index
     const changeQuestionIdx = (idx) => {
