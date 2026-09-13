@@ -251,7 +251,12 @@ export const SubjectCodeManager = ({ onRefresh }) => {
                                             </span>
                                         </td>
                                         <td style={{ textAlign: 'center' }}>
-                                            <span className={`badge ${qCount > 0 ? 'badge-primary' : 'badge-secondary'}`} style={{ fontSize: '0.82rem', padding: '0.25rem 0.65rem' }}>
+                                            {/* badge-primary/badge-secondary are not defined anywhere in
+                                                components.css (only -success/-danger/-warning/-purple/-cyan/
+                                                -orange exist) — the span rendered with no background or
+                                                color at all, so the count was blank against the table's
+                                                near-white row. */}
+                                            <span className={`badge ${qCount > 0 ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '0.82rem', padding: '0.25rem 0.65rem' }}>
                                                 {qCount} Qs
                                             </span>
                                         </td>
