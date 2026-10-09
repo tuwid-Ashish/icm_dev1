@@ -247,7 +247,19 @@ export const translations = {
         your_score_label: "Your Score",
         out_of_aspirants: "out of",
         aspirants_unit: "Aspirants",
-        top_rankers_title: "Top Rankers Leaderboard"
+        top_rankers_title: "Top Rankers Leaderboard",
+        rank_in_exam_label: "Rank in this exam",
+        overall_rank_label: "Overall rank (all exams)",
+        out_of_students: "out of {n} students",
+        not_ranked_yet: "Not ranked yet",
+        complete_full_paper_hint: "Complete a full mock paper to get ranked.",
+        practice_not_ranked: "Subject practice is not counted in rankings. Rankings use your average over full mock papers.",
+        rank_basis_note: "Ranked by average percentage across all full papers",
+        topper_avg_label: "Topper's Average",
+        your_avg_label: "Your Average",
+        avg_score_th: "Average %",
+        papers_th: "Papers",
+        tab_payments: "Payments"
     },
 
     mr: {
@@ -498,6 +510,18 @@ export const translations = {
         your_score_label: "तुमचे गुण (Your Score)",
         out_of_aspirants: "एकूण",
         aspirants_unit: "परीक्षार्थींपैकी",
-        top_rankers_title: "गुणवंत विद्यार्थी रँक लिस्ट (Top Rankers)"
+        top_rankers_title: "गुणवंत विद्यार्थी रँक लिस्ट (Top Rankers)",
+        rank_in_exam_label: "या परीक्षेतील रँक",
+        overall_rank_label: "एकूण रँक (सर्व परीक्षा)",
+        out_of_students: "एकूण {n} विद्यार्थ्यांपैकी",
+        not_ranked_yet: "अजून रँक नाही",
+        complete_full_paper_hint: "रँक मिळवण्यासाठी एक पूर्ण सराव पेपर सोडवा.",
+        practice_not_ranked: "विषयनिहाय सराव रँकमध्ये मोजला जात नाही. रँक पूर्ण पेपरच्या सरासरीवर ठरतो.",
+        rank_basis_note: "सर्व पूर्ण पेपरच्या सरासरी टक्केवारीनुसार रँक",
+        topper_avg_label: "टॉपरची सरासरी",
+        your_avg_label: "तुमची सरासरी",
+        avg_score_th: "सरासरी %",
+        papers_th: "पेपर",
+        tab_payments: "पेमेंट्स"
     }
 };

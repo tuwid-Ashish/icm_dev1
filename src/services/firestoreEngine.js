@@ -438,83 +438,34 @@ export const firestoreEngine = {
         throw new Error('Firestore database is not connected.');
     },
 
-    // 8. Decrement Student Quota after Test Start
-    decrementStudentQuota: async (uid) => {
-        const profile = await firestoreEngine.getUserProfile(uid);
-        if (!profile) return;
+    // 9. Save a finished test — server-side.
+    //
+    // /api/submit-attempt saves the attempt, uses up one test of the student's
+    // quota (or records a free-test attempt) and updates their ranking, all in
+    // one step. These used to be three separate browser writes; the quota and
+    // free-test ones touch fields the security rules reserve for the server, so
+    // they were rejected (silently, inside a catch) and a finished test never
+    // reduced anyone's quota.
+    //
+    // Throws on failure so the caller can fall back to its offline copy.
+    submitAttempt: async (attempt) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) throw new Error('Your session has expired. Please sign in again.');
 
-        const currentRemaining = profile.remainingTests || 0;
-        if (currentRemaining <= 0) return;
-
-        const nextRemaining = Math.max(0, currentRemaining - 1);
-        const nextCompleted = (profile.completedTests || 0) + 1;
-        
-        if (isFirebaseConnected && db) {
-            try {
-                const userRef = doc(db, 'users', uid);
-                await updateDoc(userRef, {
-                    remainingTests: nextRemaining,
-                    completedTests: nextCompleted,
-                    updatedAt: new Date().toISOString()
-                });
-
-                const updatedProfile = {
-                    ...profile,
-                    remainingTests: nextRemaining,
-                    completedTests: nextCompleted
-                };
-                storageService.setCurrentUser(updatedProfile);
-            } catch (e) {
-                console.error('[Firestore Engine] Quota decrement error:', e.message);
-            }
+        let res;
+        let data;
+        try {
+            res = await fetch('/api/submit-attempt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ attempt })
+            });
+            data = await res.json();
+        } catch {
+            throw new Error('Could not reach the server to save your result.');
         }
-    },
-
-    // 8b. Record a completed free-test attempt — free tests have no quota,
-    // so this count (checked against the exam's admin-configurable
-    // freeAttemptLimit in getExamAccess) is what stops unlimited retakes.
-    markFreeTestUsed: async (uid, examId) => {
-        const profile = await firestoreEngine.getUserProfile(uid);
-        if (!profile) return;
-
-        const attempts = { ...(profile.freeTestAttempts || {}) };
-        attempts[examId] = (attempts[examId] || 0) + 1;
-
-        if (isFirebaseConnected && db) {
-            try {
-                const userRef = doc(db, 'users', uid);
-                await updateDoc(userRef, {
-                    freeTestAttempts: attempts,
-                    updatedAt: new Date().toISOString()
-                });
-
-                const updatedProfile = { ...profile, freeTestAttempts: attempts };
-                storageService.setCurrentUser(updatedProfile);
-            } catch (e) {
-                console.error('[Firestore Engine] Free test usage record error:', e.message);
-            }
-        }
-    },
-
-    // 9. Save Test Attempt (Source of Truth: Firestore 'test_attempts' collection)
-    saveSubmission: async (attemptData) => {
-        if (isFirebaseConnected && db) {
-            try {
-                const attemptId = attemptData.id || ('SUB-' + Date.now().toString(36).toUpperCase());
-                const normalizedAttempt = {
-                    ...attemptData,
-                    id: attemptId
-                };
-                const subRef = doc(db, 'test_attempts', attemptId);
-                await setDoc(subRef, normalizedAttempt);
-                console.log('[Firestore Engine] Saved test attempt to Cloud Firestore test_attempts:', attemptId);
-                return normalizedAttempt;
-            } catch (err) {
-                console.error('[Firestore Engine] Error saving test attempt to Firestore:', err.message);
-                throw err;
-            }
-        }
-        throw new Error('Firestore database is not connected.');
+        if (!res.ok || !data.success) throw new Error(data?.error || 'Could not save your result.');
+        return data;
     },
 
     // 10. Fetch Test Attempts Log (Source of Truth: Firestore 'test_attempts' collection)
@@ -552,7 +503,7 @@ export const firestoreEngine = {
     // The scorecard used to read every attempt in the database to work this
     // out, exposing all students' emails, uids and answer reviews to each
     // other. /api/leaderboard returns display names and scores only.
-    getExamLeaderboard: async ({ examId, attemptId, finalScore, timeTakenSeconds, totalMarks, accuracy }) => {
+    getExamLeaderboard: async ({ examId }) => {
         const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
         if (!idToken) return null;
 
@@ -563,7 +514,7 @@ export const firestoreEngine = {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${idToken}`
                 },
-                body: JSON.stringify({ examId, attemptId, finalScore, timeTakenSeconds, totalMarks, accuracy })
+                body: JSON.stringify({ examId })
             });
             if (!res.ok) return null;
             return await res.json();
@@ -571,6 +522,41 @@ export const firestoreEngine = {
             console.error('[Firestore Engine] Leaderboard fetch failed:', e.message);
             return null;
         }
+    },
+
+    // 10c. Admin payment tools. These call administrator-only server routes —
+    // the browser never sees the Razorpay secret, and the server checks the
+    // signed admin claim, not anything the page says about itself.
+    adminListPayments: async () => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) throw new Error('Please sign in again.');
+        let res, data;
+        try {
+            res = await fetch('/api/admin/payments', { headers: { Authorization: `Bearer ${idToken}` } });
+            data = await res.json();
+        } catch {
+            throw new Error('Could not reach the server.');
+        }
+        if (!res.ok) throw new Error(data?.error || 'Could not load payments.');
+        return data.payments || [];
+    },
+
+    adminCreditPayment: async ({ paymentId, uid }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) throw new Error('Please sign in again.');
+        let res, data;
+        try {
+            res = await fetch('/api/admin/credit-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ paymentId, uid })
+            });
+            data = await res.json();
+        } catch {
+            throw new Error('Could not reach the server.');
+        }
+        if (!res.ok) throw new Error(data?.error || 'Could not credit this payment.');
+        return data;
     },
 
     // 11. Course Packages Management (Source of Truth: Firestore 'packages' collection)

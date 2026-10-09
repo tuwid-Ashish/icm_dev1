@@ -197,6 +197,9 @@ class ExamEngine {
             studentEmail: studentInfo?.studentEmail || currentUser?.email || 'student@sigma.com',
             examId: exam.id,
             isFreeTest: !!exam.isFreeTest,
+            // 'full' = the exam's own blueprint paper; 'subject' = a one-subject
+            // practice drill. Only full papers count towards ranking.
+            paperType: subjectFilter !== 'ALL' ? 'subject' : 'full',
             examName: subjectFilter !== 'ALL' ? `${exam.name} (${resolvedSubjectDisplay} Practice)` : exam.name,
             examCode: exam.code,
             durationMinutes: subjectFilter !== 'ALL' ? Math.max(10, Math.ceil(generatedQuestions.length * 1.0)) : exam.durationMinutes,
@@ -283,7 +286,12 @@ class ExamEngine {
         const currentUser = storageService.getCurrentUser();
 
         const result = {
-            id: 'SUB-' + Date.now().toString(36).toUpperCase(),
+            // Derived from the session, not the clock: a second submit of the
+            // same session (timer auto-submit racing the button) then produces
+            // the same id, and the server saves it once instead of twice.
+            id: session.id ? 'SUB-' + String(session.id).replace(/^SESSION-/, '') : 'SUB-' + Date.now().toString(36).toUpperCase(),
+            paperType: session.paperType || (/practice/i.test(session.examName || '') ? 'subject' : 'full'),
+            isFreeTest: !!session.isFreeTest,
             sessionId: session.id,
             studentId: session.studentId,
             studentName: session.studentName || currentUser?.name || 'Student User',

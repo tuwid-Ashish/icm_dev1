@@ -173,7 +173,10 @@ export const SystemReportsPage = () => {
                                 return (
                                     <tr key={sub.id} style={{ background: isTopScoreSort && rank === 1 ? 'rgba(234, 88, 12, 0.05)' : 'transparent' }}>
                                         <td style={{ textAlign: 'center', fontWeight: 800 }}>
-                                            {isTopScoreSort && rank === 1 ? '🥇 #1' : isTopScoreSort && rank === 2 ? '🥈 #2' : isTopScoreSort && rank === 3 ? '🥉 #3' : `#${rank}`}
+                                            {/* A rank only means something when the list is sorted by score. Under
+                                                any other sort, `index + 1` is just a row number — sorting by date made
+                                                the newest submission show as "#1". */}
+                                            {!isTopScoreSort ? '—' : rank === 1 ? '🥇 #1' : rank === 2 ? '🥈 #2' : rank === 3 ? '🥉 #3' : `#${rank}`}
                                         </td>
                                         <td>
                                             <strong>{getStudentDisplayName(sub)}</strong><br />

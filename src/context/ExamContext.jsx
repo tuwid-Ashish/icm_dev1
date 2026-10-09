@@ -231,14 +231,10 @@ export const ExamProvider = ({ children }) => {
         const evaluated = evaluateSubmission(sessionToSubmit, timeTakenSecs);
 
         try {
-            // Save scorecard submission to Cloud Firestore & LocalStorage
-            await firestoreEngine.saveSubmission(evaluated);
-
-            if (!sessionToSubmit.isFreeTest) {
-                await firestoreEngine.decrementStudentQuota(sessionToSubmit.studentId);
-            } else {
-                await firestoreEngine.markFreeTestUsed(sessionToSubmit.studentId, sessionToSubmit.examId);
-            }
+            // One server call saves the attempt, uses up the student's quota (or
+            // records the free-test attempt) and updates their ranking. Retrying
+            // is safe — the server saves a given attempt id once.
+            await firestoreEngine.submitAttempt(evaluated);
             if (refreshUser) refreshUser();
         } catch (err) {
             console.error('[ExamContext] Error saving submission remotely, saving offline fallback:', err);

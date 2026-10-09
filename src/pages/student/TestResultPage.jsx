@@ -37,10 +37,14 @@ export const TestResultPage = ({ result, onBack }) => {
 
     if (!result) return null;
 
-    const userRank = board?.userRank ?? 1;
-    const totalCandidates = board?.totalCandidates ?? 1;
-    const topperScore = board?.topperScore ?? result.finalScore;
+    // Standing comes from /api/leaderboard: one row per student, average % over
+    // full papers. `null` means not ranked yet (no full paper completed).
+    const examStanding = board?.exam;
+    const overallStanding = board?.overall;
     const topRankers = board?.topRankers ?? [];
+    const isPractice = result.paperType === 'subject';
+    const fmtPct = (v) => (v === null || v === undefined ? '—' : `${v}%`);
+    const outOf = (n) => t('out_of_students').replace('{n}', n);
 
     const getRankBadge = (idx) => {
         if (idx === 0) return '🥇 #1';
@@ -126,15 +130,28 @@ export const TestResultPage = ({ result, onBack }) => {
                     </div>
 
                     <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
-                        {t('your_rank_label')}
+                        {t('rank_in_exam_label')}
                     </div>
 
                     <div style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(2.5rem, 6vw, 3.8rem)', fontWeight: 900, color: '#a855f7', lineHeight: 1 }}>
-                        #{userRank}
+                        {loadingRank ? '…' : examStanding?.ranked ? `#${examStanding.rank}` : '—'}
                     </div>
 
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                        {t('out_of_aspirants')} <strong>{totalCandidates}</strong> {t('aspirants_unit')}
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        {loadingRank ? '' : examStanding?.ranked
+                            ? outOf(examStanding.totalStudents)
+                            : `${t('not_ranked_yet')}. ${t('complete_full_paper_hint')}`}
+                    </div>
+
+                    {!loadingRank && overallStanding?.ranked && (
+                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                            {t('overall_rank_label')}: <span style={{ color: '#6366f1', fontWeight: 900 }}>#{overallStanding.rank}</span>{' '}
+                            <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>{outOf(overallStanding.totalStudents)}</span>
+                        </div>
+                    )}
+
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: '34rem', marginBottom: '0.5rem' }}>
+                        {isPractice ? t('practice_not_ranked') : t('rank_basis_note')}
                     </div>
 
                     <button 
@@ -163,23 +180,23 @@ export const TestResultPage = ({ result, onBack }) => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                     <div style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '2px solid #eab308', textAlign: 'center' }}>
-                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#eab308' }}>#{userRank}</div>
+                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#eab308' }}>{examStanding?.ranked ? `#${examStanding.rank}` : '—'}</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
                             {t('your_rank_label')}
                         </div>
                     </div>
 
                     <div style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '2px solid #3b82f6', textAlign: 'center' }}>
-                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#3b82f6' }}>{topperScore}</div>
+                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#3b82f6' }}>{fmtPct(examStanding?.topAvgPct)}</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                            {t('topper_score_label')}
+                            {t('topper_avg_label')}
                         </div>
                     </div>
 
                     <div style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '2px solid #10b981', textAlign: 'center' }}>
-                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#10b981' }}>{result.finalScore}</div>
+                        <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#10b981' }}>{fmtPct(examStanding?.myAvgPct)}</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                            {t('your_score_label')}
+                            {t('your_avg_label')}
                         </div>
                     </div>
                 </div>
@@ -233,24 +250,24 @@ export const TestResultPage = ({ result, onBack }) => {
                                     <tr>
                                         <th>{t('rank_th')}</th>
                                         <th>{t('student_name_th')}</th>
-                                        <th>{t('score_th')}</th>
-                                        <th>{t('accuracy_th')}</th>
+                                        <th>{t('avg_score_th')}</th>
+                                        <th>{t('papers_th')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {topRankers.map((item, idx) => (
                                         <tr key={idx} style={{ background: item.isYou ? 'rgba(168, 85, 247, 0.15)' : 'transparent' }}>
                                             <td>
-                                                <strong style={{ fontSize: '1.1rem', color: idx === 0 ? '#eab308' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : 'var(--text-primary)' }}>
-                                                    {getRankBadge(idx)}
+                                                <strong style={{ fontSize: '1.1rem', color: item.rank === 1 ? '#eab308' : item.rank === 2 ? '#94a3b8' : item.rank === 3 ? '#b45309' : 'var(--text-primary)' }}>
+                                                    {getRankBadge(item.rank - 1)}
                                                 </strong>
                                             </td>
                                             <td>
                                                 <strong>{item.name || 'Student User'}</strong>
                                                 {item.isYou && <span className="badge badge-success" style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>You</span>}
                                             </td>
-                                            <td><strong>{item.finalScore} / {item.totalMarks || result.totalMarks}</strong></td>
-                                            <td>{item.accuracy}%</td>
+                                            <td><strong>{item.avgPct}%</strong></td>
+                                            <td>{item.papers}</td>
                                         </tr>
                                     ))}
                                 </tbody>

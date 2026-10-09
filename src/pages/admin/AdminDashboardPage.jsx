@@ -7,13 +7,14 @@ import { FreeTestManager } from '../../components/admin/FreeTestManager.jsx';
 import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { ExamPaperGenerator } from '../../components/admin/ExamPaperGenerator.jsx';
+import { PaymentsPanel } from '../../components/admin/PaymentsPanel.jsx';
 import { SubjectWiseCountWidget } from '../../components/admin/SubjectWiseCountWidget.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
 export const AdminDashboardPage = () => {
     const { t } = useLanguage();
-    // Tabs: 'overview' | 'students' | 'packages' | 'questions' | 'subject_codes' | 'exams' | 'free_tests' | 'reports' | 'exam_paper'
+    // Tabs: 'overview' | 'students' | 'packages' | 'payments' | 'questions' | 'subject_codes' | 'exams' | 'free_tests' | 'reports' | 'exam_paper'
     const [activeTab, setActiveTab] = useState('overview');
     const [questions, setQuestions] = useState([]);
     const [subjectCodes, setSubjectCodes] = useState([]);
@@ -84,6 +85,12 @@ export const AdminDashboardPage = () => {
                     onClick={() => setActiveTab('packages')}
                 >
                     {t('tab_packages')}
+                </button>
+                <button 
+                    className={`btn ${activeTab === 'payments' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('payments')}
+                >
+                    {t('tab_payments')}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'questions' ? 'btn-primary' : 'btn-secondary'}`}
@@ -194,6 +201,7 @@ export const AdminDashboardPage = () => {
 
             {activeTab === 'students' && <StudentTable onRefresh={loadStats} />}
             {activeTab === 'packages' && <PackageManager onRefresh={loadStats} />}
+            {activeTab === 'payments' && <PaymentsPanel />}
             {activeTab === 'questions' && <QuestionBankManager onRefresh={loadStats} />}
             {activeTab === 'subject_codes' && <SubjectCodeManager onRefresh={loadStats} />}
             {activeTab === 'exams' && <ExamConfigList />}
