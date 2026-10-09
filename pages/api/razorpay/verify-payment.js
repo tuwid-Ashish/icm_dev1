@@ -89,6 +89,16 @@ export default async function handler(req, res) {
             res.status(400).json({ verified: false, error: 'Payment does not belong to this order.' });
             return;
         }
+        // create-order stamps the buyer's uid on the order, and Razorpay copies
+        // order notes onto the payment. A payment started by someone else must
+        // not be claimable from a different account. Orders created before this
+        // was added carry no uid, so only enforce it when one is present.
+        const orderOwner = payment.notes && payment.notes.uid;
+        if (orderOwner && orderOwner !== uid) {
+            console.warn('[verify-payment] Payment', paymentId, 'belongs to a different account than caller', uid);
+            res.status(403).json({ verified: false, error: 'This payment was made from a different account.' });
+            return;
+        }
         if (payment.status !== 'captured' && payment.status !== 'authorized') {
             res.status(400).json({ verified: false, error: `Payment is not complete (status: ${payment.status}).` });
             return;

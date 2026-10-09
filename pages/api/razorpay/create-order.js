@@ -1,12 +1,31 @@
 /**
  * POST /api/razorpay/create-order
- * Body: { amount: number (INR, rupees), packageId: string }
+ * Headers: Authorization: Bearer <Firebase ID token>
+ * Body:    { packageId }
  *
- * Creates a real Razorpay order using the Key Secret, which lives only in
- * this server-side function's environment (Vercel dashboard env var) — it
- * is never sent to, or readable by, the browser. Returns the public Key ID
- * and order id needed to open the Razorpay checkout on the client.
+ * Creates a Razorpay order for one package, on behalf of the signed-in student.
+ *
+ * Three things are decided HERE rather than trusted from the browser:
+ *
+ *   who    ← the verified ID token. It is stamped on the order (notes.uid), so a
+ *            captured payment can always be traced to a student without
+ *            matching on email or phone.
+ *   what   ← packageId, which must exist in Firestore.
+ *   price  ← the package document. The body used to carry `amount`, which meant
+ *            checkout could charge one price while verify-payment (which reads
+ *            the same package) demanded another — a mismatch that takes the
+ *            student's money and credits nothing.
+ *
+ * This route deliberately depends on the Firebase Admin SDK, the same as
+ * /api/razorpay/verify-payment. If the server cannot credit a purchase it must
+ * also refuse to start one: failing here costs the student nothing, whereas
+ * failing after checkout takes their money and leaves them with no package.
+ *
+ * Razorpay Key Secret lives only in this server-side environment and is never
+ * sent to the browser. Returns the public Key ID and order id for checkout.
  */
+import { adminDb, verifyCaller } from '../../../lib/firebaseAdmin.js';
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
@@ -21,15 +40,31 @@ export default async function handler(req, res) {
         return;
     }
 
-    const { amount, packageId } = req.body || {};
-    const amountRupees = Number(amount);
+    const caller = await verifyCaller(req);
+    if (!caller) {
+        res.status(401).json({ error: 'Please sign in to purchase a package.' });
+        return;
+    }
 
-    if (!amountRupees || amountRupees <= 0) {
-        res.status(400).json({ error: 'A valid positive amount is required.' });
+    const { packageId } = req.body || {};
+    if (!packageId || typeof packageId !== 'string') {
+        res.status(400).json({ error: 'A package is required.' });
         return;
     }
 
     try {
+        const pkgSnap = await adminDb.collection('packages').doc(packageId).get();
+        if (!pkgSnap.exists) {
+            res.status(400).json({ error: 'Unknown package.' });
+            return;
+        }
+        const pkg = pkgSnap.data();
+        const amountRupees = Number(pkg.discountPrice || pkg.price || 0);
+        if (!amountRupees || amountRupees <= 0) {
+            res.status(400).json({ error: 'This package has no price configured.' });
+            return;
+        }
+
         const authHeader = 'Basic ' + Buffer.from(`${keyId}:${keySecret}`).toString('base64');
 
         const razorpayRes = await fetch('https://api.razorpay.com/v1/orders', {
@@ -41,8 +76,8 @@ export default async function handler(req, res) {
             body: JSON.stringify({
                 amount: Math.round(amountRupees * 100), // paise
                 currency: 'INR',
-                receipt: `pkg_${packageId || 'unknown'}_${Date.now()}`,
-                notes: { packageId: packageId || '' }
+                receipt: `pkg_${packageId}_${Date.now()}`,
+                notes: { packageId, uid: caller.uid }
             })
         });
 

@@ -792,15 +792,34 @@ export const firestoreEngine = {
     // 14a-i. Create a real Razorpay order server-side (/api/razorpay/create-order).
     // The Key Secret never reaches the browser — this just returns the order id
     // and public Key ID needed to open the checkout popup.
-    createRazorpayOrder: async ({ amount, packageId }) => {
-        const res = await fetch('/api/razorpay/create-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount, packageId })
-        });
-        const data = await res.json();
+    createRazorpayOrder: async ({ packageId }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) {
+            throw new Error('Your session has expired. Please sign in again before paying.');
+        }
+
+        let res;
+        let data;
+        try {
+            res = await fetch('/api/razorpay/create-order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`
+                },
+                // No amount: the server prices the order from the package
+                // document, so the browser cannot disagree with verify-payment.
+                body: JSON.stringify({ packageId })
+            });
+            data = await res.json();
+        } catch {
+            // Network failure, or the server crashed and returned an HTML error
+            // page instead of JSON. Nothing has been charged at this point.
+            throw new Error('Payments are temporarily unavailable. You have not been charged — please try again shortly.');
+        }
+
         if (!res.ok) {
-            throw new Error(data?.error || 'Could not create Razorpay order.');
+            throw new Error(data?.error || 'Could not start checkout. You have not been charged.');
         }
         return data;
     },
@@ -814,23 +833,44 @@ export const firestoreEngine = {
     // the amount actually paid from the Razorpay API. Anything this browser
     // claims about those is ignored.
     verifyRazorpayPayment: async ({ orderId, paymentId, signature, packageId }) => {
+        // This runs AFTER the gateway has taken the money, so every failure
+        // here must come back as a result the UI can show — never a thrown
+        // error. A crashed server returns an HTML error page, which made
+        // res.json() throw inside Razorpay's handler: no message, spinner stuck,
+        // and the student unable to tell whether they had been charged.
         const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
         if (!idToken) {
-            return { success: false, error: 'Your session has expired. Please sign in again before paying.' };
+            return { success: false, retryable: false, error: 'Your session has expired. Please sign in again.' };
         }
 
-        const res = await fetch('/api/razorpay/verify-payment', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${idToken}`
-            },
-            body: JSON.stringify({ orderId, paymentId, signature, packageId })
-        });
-        const data = await res.json();
+        let res;
+        let data;
+        try {
+            res = await fetch('/api/razorpay/verify-payment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ orderId, paymentId, signature, packageId })
+            });
+            data = await res.json();
+        } catch {
+            return {
+                success: false,
+                retryable: true,
+                error: 'We could not reach our server to add your package.'
+            };
+        }
 
         if (!res.ok || !data.success) {
-            return { success: false, error: data?.error || 'Payment verification failed.' };
+            return {
+                success: false,
+                // A server-side fault (5xx) is worth retrying; a rejected
+                // payment (4xx) will fail the same way again.
+                retryable: res.status >= 500,
+                error: data?.error || 'Payment verification failed.'
+            };
         }
 
         return {

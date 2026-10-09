@@ -11,6 +11,10 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
     const [successMessage, setSuccessMessage] = useState('');
     const [successPaymentId, setSuccessPaymentId] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    // Set when the gateway has taken the money but crediting failed. While it
+    // is set the pay button is hidden: the student has already paid, and a
+    // second payment would be a second charge for the same package.
+    const [paymentIssue, setPaymentIssue] = useState(null);
 
     const [paymentConfig, setPaymentConfig] = useState({
         merchantName: 'SigmaForce CEP Official',
@@ -52,6 +56,30 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
 
     const amountToPay = pkg.discountPrice || pkg.price;
 
+    // Ask the server to credit a payment the gateway has already captured.
+    // Safe to call repeatedly with the same ids: the server credits a given
+    // payment id at most once, so "try again" can never double-credit.
+    const creditPayment = async (ids) => {
+        setLoading(true);
+        setErrorMessage('');
+        const res = await firestoreEngine.verifyRazorpayPayment({ ...ids, packageId: pkg.id });
+        setLoading(false);
+
+        if (res.success) {
+            setPaymentIssue(null);
+            setSuccessPaymentId(ids.paymentId);
+            setSuccessMessage(res.message || t('quota_credited_msg'));
+            setTimeout(() => {
+                // The server wrote the quota; re-read the profile
+                // rather than trusting a locally-built user object.
+                if (onSuccess) onSuccess();
+                onClose();
+            }, 3000);
+        } else {
+            setPaymentIssue({ ...ids, message: res.error, retryable: !!res.retryable });
+        }
+    };
+
     // Trigger Official Razorpay Gateway Popup — order is created server-side
     // (/api/razorpay/create-order) so the Key Secret never touches the browser,
     // and the resulting order_id lets us cryptographically verify the payment
@@ -62,10 +90,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
 
         let order;
         try {
-            order = await firestoreEngine.createRazorpayOrder({
-                amount: amountToPay,
-                packageId: pkg.id
-            });
+            order = await firestoreEngine.createRazorpayOrder({ packageId: pkg.id });
         } catch (err) {
             setLoading(false);
             setErrorMessage('Could not start checkout: ' + (err.message || 'Server order creation failed.'));
@@ -88,31 +113,16 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
             theme: {
                 color: '#ea580c'
             },
-            handler: async function (response) {
+            handler: function (response) {
                 // Only the ids go to the server. It takes the buyer from the
                 // Firebase ID token, the price and quota from the package
                 // document, and the amount paid from the Razorpay API — so
                 // there is nothing here worth tampering with.
-                const res = await firestoreEngine.verifyRazorpayPayment({
+                return creditPayment({
                     orderId: response.razorpay_order_id,
                     paymentId: response.razorpay_payment_id,
-                    signature: response.razorpay_signature,
-                    packageId: pkg.id
+                    signature: response.razorpay_signature
                 });
-                setLoading(false);
-
-                if (res.success) {
-                    setSuccessPaymentId(response.razorpay_payment_id);
-                    setSuccessMessage(res.message || t('quota_credited_msg'));
-                    setTimeout(() => {
-                        // The server wrote the quota; re-read the profile
-                        // rather than trusting a locally-built user object.
-                        if (onSuccess) onSuccess();
-                        onClose();
-                    }, 3000);
-                } else {
-                    setErrorMessage(res.error || 'Payment verification failed.');
-                }
             },
             modal: {
                 ondismiss: function () {
@@ -200,7 +210,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                         </div>
                     </div>
 
-                    {errorMessage && (
+                    {errorMessage && !paymentIssue && (
                         <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', fontWeight: 700, marginBottom: '1rem' }}>
                             {errorMessage}
                         </div>
@@ -209,6 +219,32 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                     {/* Razorpay is the only checkout route. The manual UPI QR + UTR
                         flow was removed from the UI; firestoreEngine.savePackagePurchaseRequest
                         and the admin approval queue remain for historical requests. */}
+                    {paymentIssue ? (
+                        <div role="alert" style={{ border: '2px solid var(--danger-border)', background: 'var(--danger-bg)', padding: '1.5rem', borderRadius: 'var(--radius-lg)' }}>
+                            <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--danger)', marginBottom: '0.6rem' }}>
+                                Payment received — your package is not added yet
+                            </h4>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                                {paymentIssue.message} <strong>Please do not pay again.</strong> Your money is safe and
+                                the package will be added to your account.
+                            </p>
+                            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.9rem', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                                Payment ID: <code style={{ fontWeight: 800, color: 'var(--primary)', wordBreak: 'break-all' }}>{paymentIssue.paymentId}</code>
+                                <div style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                                    Keep this ID and share it with support if the package does not appear.
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                {paymentIssue.retryable && (
+                                    <button type="button" className="btn btn-primary" disabled={loading}
+                                        onClick={() => creditPayment({ orderId: paymentIssue.orderId, paymentId: paymentIssue.paymentId, signature: paymentIssue.signature })}>
+                                        {loading ? 'Trying…' : 'Try adding my package again'}
+                                    </button>
+                                )}
+                                <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+                            </div>
+                        </div>
+                    ) : (
                         <div style={{ border: '2px solid var(--primary-border)', background: 'var(--bg-surface)', padding: '1.5rem', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
                             <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🔒</div>
                             <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
@@ -232,6 +268,7 @@ export const PackagePurchaseModal = ({ pkg, isOpen, onClose, onSuccess }) => {
                                 )}
                             </button>
                         </div>
+                    )}
                 </>
             )}
         </Modal>
