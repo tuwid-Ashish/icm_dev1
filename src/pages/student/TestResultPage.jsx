@@ -138,9 +138,11 @@ export const TestResultPage = ({ result, onBack }) => {
                     </div>
 
                     <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        {loadingRank ? '' : examStanding?.ranked
-                            ? outOf(examStanding.totalStudents)
-                            : `${t('not_ranked_yet')}. ${t('complete_full_paper_hint')}`}
+                        {loadingRank ? '' : !board
+                            ? t('rank_unavailable')
+                            : examStanding?.ranked
+                                ? outOf(examStanding.totalStudents)
+                                : `${t('not_ranked_yet')}. ${t('complete_full_paper_hint')}`}
                     </div>
 
                     {!loadingRank && overallStanding?.ranked && (

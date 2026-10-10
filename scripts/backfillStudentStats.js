@@ -65,7 +65,7 @@ async function run() {
             lastPct = r.rankPct; lastRank = rank;
             console.log(`   #${String(rank).padEnd(3)} ${mask(r.uid).padEnd(11)} avg ${String(r.avgPct).padStart(6)}%  best ${String(r.bestPct).padStart(6)}%  papers ${r.count}`);
         });
-    });
+    }
 
     const overall = students.filter(s => s.overall.count).sort((a, b) => b.overall.rankPct - a.overall.rankPct);
     console.log(`\n── OVERALL (paid exams) — ${overall.length} student(s) ──`);

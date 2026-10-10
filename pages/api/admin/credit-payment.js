@@ -33,7 +33,18 @@ export default async function handler(req, res) {
     }
 
     try {
-        const payment = await razorpayGet(`payments/${encodeURIComponent(paymentId)}`);
+        let payment;
+        try {
+            payment = await razorpayGet(`payments/${encodeURIComponent(paymentId)}`);
+        } catch (err) {
+            // Razorpay answers 4xx for an id it does not know. That is the
+            // admin's input, not a server fault.
+            if (err.httpStatus >= 400 && err.httpStatus < 500) {
+                res.status(404).json({ error: 'Razorpay has no payment with that ID.' });
+                return;
+            }
+            throw err;
+        }
 
         if (payment.status !== 'captured') {
             res.status(400).json({ error: `This payment was not completed (status: ${payment.status}), so nothing was paid for.` });
