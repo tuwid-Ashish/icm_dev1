@@ -16,6 +16,14 @@ export const StudentTable = ({ onRefresh }) => {
     const [allowedTests, setAllowedTests] = useState(0);
     const [status, setStatus] = useState('active');
 
+    // Password reset dialog
+    const [pwStudent, setPwStudent] = useState(null);
+    const [pwInput, setPwInput] = useState('');
+    const [pwBusy, setPwBusy] = useState(false);
+    const [pwError, setPwError] = useState('');
+    const [pwResult, setPwResult] = useState(null);   // { password, generated, email } once set
+    const [pwCopied, setPwCopied] = useState(false);
+
     const loadStudents = async () => {
         setLoading(true);
         const stdList = await firestoreEngine.getStudents();
@@ -71,6 +79,50 @@ export const StudentTable = ({ onRefresh }) => {
         if (onRefresh) onRefresh();
     };
 
+    const openPasswordReset = (std) => {
+        setPwStudent(std);
+        setPwInput('');
+        setPwError('');
+        setPwResult(null);
+        setPwCopied(false);
+    };
+
+    const closePasswordReset = () => {
+        if (pwBusy) return;
+        setPwStudent(null);
+        setPwResult(null);
+        setPwInput('');
+    };
+
+    const handlePasswordReset = async (e) => {
+        e.preventDefault();
+        if (!pwStudent) return;
+        const typed = pwInput.trim();
+        if (typed && typed.length < 8) {
+            setPwError('A password you type must be at least 8 characters. Leave it empty to generate one.');
+            return;
+        }
+        setPwBusy(true);
+        setPwError('');
+        try {
+            const res = await firestoreEngine.adminResetStudentPassword({ uid: pwStudent.id || pwStudent.uid, password: typed });
+            setPwResult(res);
+        } catch (err) {
+            setPwError(err.message || 'Could not reset the password.');
+        } finally {
+            setPwBusy(false);
+        }
+    };
+
+    const copyPassword = async () => {
+        try {
+            await navigator.clipboard.writeText(pwResult.password);
+            setPwCopied(true);
+        } catch {
+            setPwCopied(false);
+        }
+    };
+
     const handleToggleStatus = async (std) => {
         const nextStatus = std.status === 'active' ? 'disabled' : 'active';
         const stdId = std.id || std.uid;
@@ -101,7 +153,7 @@ export const StudentTable = ({ onRefresh }) => {
                             <th>Allowed Quota</th>
                             <th>Remaining Tests</th>
                             <th>Status</th>
-                            <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>Actions</th>
+                            <th style={{ minWidth: '330px', whiteSpace: 'nowrap' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -148,6 +200,9 @@ export const StudentTable = ({ onRefresh }) => {
                                         <div className="action-buttons-group" style={{ gap: '0.75rem' }}>
                                             <button className="btn btn-secondary btn-sm" onClick={() => handleOpenModal(s)}>
                                                 Edit Details
+                                            </button>
+                                            <button className="btn btn-secondary btn-sm" onClick={() => openPasswordReset(s)}>
+                                                Reset Password
                                             </button>
                                             <button 
                                                 className={`btn ${s.status === 'active' ? 'btn-danger' : 'btn-primary'} btn-sm`}
@@ -205,6 +260,77 @@ export const StudentTable = ({ onRefresh }) => {
                         <option value="disabled">Disabled</option>
                     </select>
                 </div>
+            </Modal>
+
+            {/* Reset a student login password */}
+            <Modal
+                isOpen={!!pwStudent}
+                onClose={closePasswordReset}
+                title={pwResult ? 'New password ready' : 'Reset student password'}
+                subtitle={pwStudent ? `${pwStudent.name || 'Student'} - ${pwStudent.email || ''}` : ''}
+                maxWidth="520px"
+                onSubmit={pwResult ? undefined : handlePasswordReset}
+                footer={
+                    pwResult ? (
+                        <button type="button" className="btn btn-primary" onClick={closePasswordReset}>Done</button>
+                    ) : (
+                        <>
+                            <button type="button" className="btn btn-secondary" onClick={closePasswordReset} disabled={pwBusy}>Cancel</button>
+                            <button type="submit" className="btn btn-primary" disabled={pwBusy}>
+                                {pwBusy ? 'Setting...' : 'Set new password'}
+                            </button>
+                        </>
+                    )
+                }
+            >
+                {pwResult ? (
+                    <div>
+                        <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+                            The password for <strong>{pwResult.email || pwStudent?.email}</strong> has been changed. Give the student these login details:
+                        </p>
+                        <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.9rem 1rem', marginBottom: '0.75rem' }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Email</div>
+                            <div style={{ fontWeight: 700, marginBottom: '0.6rem', wordBreak: 'break-all' }}>{pwResult.email || pwStudent?.email}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>New password</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                <code style={{ fontSize: '1.35rem', fontWeight: 800, letterSpacing: '1px', color: 'var(--primary)' }}>{pwResult.password}</code>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={copyPassword}>
+                                    {pwCopied ? 'Copied' : 'Copy'}
+                                </button>
+                            </div>
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 700 }}>
+                            This is the only time the password is shown - it is not saved anywhere. If it is lost, reset it again.
+                            Any device still signed in with the old password will be signed out within about an hour.
+                        </p>
+                    </div>
+                ) : (
+                    <div>
+                        {pwError && (
+                            <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.6rem 0.85rem', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '1rem' }}>
+                                {pwError}
+                            </div>
+                        )}
+                        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                            Use this when a student has forgotten their password. The old password stops working immediately and you
+                            will be shown the new one to pass on.
+                        </p>
+                        <div className="form-group">
+                            <label className="form-label">New password</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                value={pwInput}
+                                onChange={e => setPwInput(e.target.value)}
+                                placeholder="Leave empty to generate a strong password"
+                                autoComplete="off"
+                            />
+                            <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                                Or type your own (at least 8 characters).
+                            </small>
+                        </div>
+                    </div>
+                )}
             </Modal>
         </div>
     );

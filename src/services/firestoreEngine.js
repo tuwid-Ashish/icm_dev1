@@ -559,6 +559,26 @@ export const firestoreEngine = {
         return data;
     },
 
+    // Sets a student's login password (admin only). Returns { password } — shown
+    // to the admin once so it can be passed to the student; it is not stored.
+    adminResetStudentPassword: async ({ uid, password }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) throw new Error('Please sign in again.');
+        let res, data;
+        try {
+            res = await fetch('/api/admin/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ uid, password: password || undefined })
+            });
+            data = await res.json();
+        } catch {
+            throw new Error('Could not reach the server.');
+        }
+        if (!res.ok) throw new Error(data?.error || 'Could not reset the password.');
+        return data;
+    },
+
     // 11. Course Packages Management (Source of Truth: Firestore 'packages' collection)
     getPackages: async () => {
         if (isFirebaseConnected && db) {
