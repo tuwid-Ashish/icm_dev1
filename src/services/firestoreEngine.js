@@ -579,6 +579,19 @@ export const firestoreEngine = {
         return data;
     },
 
+    // Firestore usage today and for the last week, from the server (admin only).
+    // Never throws: { available: false, message } explains what to switch on.
+    adminGetUsage: async () => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) return { available: false, reason: 'signin', message: 'Please sign in again.' };
+        try {
+            const res = await fetch('/api/admin/usage', { headers: { Authorization: `Bearer ${idToken}` } });
+            return await res.json();
+        } catch {
+            return { available: false, reason: 'error', message: 'Could not reach the server.' };
+        }
+    },
+
     // Creates a student who can actually sign in (login + profile, same id).
     // Returns { uid, email, password } — the password is shown to the admin once.
     adminCreateStudent: async ({ name, email, mobile, enrollmentId, allowedTests, password }) => {

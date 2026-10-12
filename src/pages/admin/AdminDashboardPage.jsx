@@ -8,6 +8,7 @@ import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { ExamPaperGenerator } from '../../components/admin/ExamPaperGenerator.jsx';
 import { PaymentsPanel } from '../../components/admin/PaymentsPanel.jsx';
+import { UsageMeter, UsageBanner } from '../../components/admin/UsagePanel.jsx';
 import { SubjectWiseCountWidget } from '../../components/admin/SubjectWiseCountWidget.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
@@ -65,6 +66,9 @@ export const AdminDashboardPage = () => {
                     {t('admin_panel_desc')}
                 </p>
             </div>
+
+            {/* Appears on any screen the moment Firebase's daily free limit is used up */}
+            <UsageBanner />
 
             {/* Navigation Tabs Bar */}
             <div className="scrollable-tabs-bar no-print">
@@ -133,6 +137,8 @@ export const AdminDashboardPage = () => {
             {/* Overview Tab Content */}
             {activeTab === 'overview' && (
                 <div>
+                    <UsageMeter questionCount={stats.totalQuestions} />
+
                     <div className="stats-grid">
                         <div className="stat-card" onClick={() => setActiveTab('students')} style={{ cursor: 'pointer' }}>
                             <div className="stat-title">Registered Students</div>
