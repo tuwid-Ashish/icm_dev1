@@ -575,7 +575,27 @@ export const firestoreEngine = {
         } catch {
             throw new Error('Could not reach the server.');
         }
-        if (!res.ok) throw new Error(data?.error || 'Could not reset the password.');
+        if (!res.ok) throw new Error((data?.error || 'Could not reset the password.') + (data?.detail ? ` (${data.detail})` : ''));
+        return data;
+    },
+
+    // Creates a student who can actually sign in (login + profile, same id).
+    // Returns { uid, email, password } — the password is shown to the admin once.
+    adminCreateStudent: async ({ name, email, mobile, enrollmentId, allowedTests, password }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) throw new Error('Please sign in again.');
+        let res, data;
+        try {
+            res = await fetch('/api/admin/create-student', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ name, email, mobile, enrollmentId, allowedTests, password: password || undefined })
+            });
+            data = await res.json();
+        } catch {
+            throw new Error('Could not reach the server.');
+        }
+        if (!res.ok) throw new Error((data?.error || 'Could not create the student.') + (data?.detail ? ` (${data.detail})` : ''));
         return data;
     },
 

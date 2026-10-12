@@ -16,7 +16,12 @@ export const StudentTable = ({ onRefresh }) => {
     const [allowedTests, setAllowedTests] = useState(0);
     const [status, setStatus] = useState('active');
 
-    // Password reset dialog
+    // Creating a new student (login + profile)
+    const [createPassword, setCreatePassword] = useState('');
+    const [createBusy, setCreateBusy] = useState(false);
+    const [createError, setCreateError] = useState('');
+
+    // Password reset dialog (also used to show a new student's login details once)
     const [pwStudent, setPwStudent] = useState(null);
     const [pwInput, setPwInput] = useState('');
     const [pwBusy, setPwBusy] = useState(false);
@@ -37,6 +42,8 @@ export const StudentTable = ({ onRefresh }) => {
 
     const handleOpenModal = (std = null) => {
         setEditingStudent(std);
+        setCreateError('');
+        setCreatePassword('');
         if (std) {
             setName(std.name || '');
             setEmail(std.email || '');
@@ -63,7 +70,40 @@ export const StudentTable = ({ onRefresh }) => {
             return;
         }
 
-        const stdId = editingStudent ? (editingStudent.id || editingStudent.uid) : 'std_' + Date.now();
+        if (!editingStudent) {
+            // A new student needs a real login, not just a profile — a profile with
+            // no login behind it can never sign in. The server creates both.
+            const typed = createPassword.trim();
+            if (typed && typed.length < 8) {
+                setCreateError('A password you type must be at least 8 characters. Leave it empty to generate one.');
+                return;
+            }
+            setCreateBusy(true);
+            setCreateError('');
+            try {
+                const res = await firestoreEngine.adminCreateStudent({
+                    name: name.trim(),
+                    email: email.trim(),
+                    mobile: cleanMobile,
+                    enrollmentId,
+                    allowedTests: parseInt(allowedTests, 10) || 0,
+                    password: typed
+                });
+                setModalOpen(false);
+                setPwStudent({ name: name.trim(), email: res.email });
+                setPwResult({ password: res.password, email: res.email, created: true });
+                setPwCopied(false);
+                await loadStudents();
+                if (onRefresh) onRefresh();
+            } catch (err) {
+                setCreateError(err.message || 'Could not create the student.');
+            } finally {
+                setCreateBusy(false);
+            }
+            return;
+        }
+
+        const stdId = editingStudent.id || editingStudent.uid;
         await firestoreEngine.saveStudentProfile({
             id: stdId,
             uid: stdId,
@@ -228,11 +268,18 @@ export const StudentTable = ({ onRefresh }) => {
                 onSubmit={handleSave}
                 footer={
                     <>
-                        <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-                        <button type="submit" className="btn btn-primary">Save Student Details</button>
+                        <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)} disabled={createBusy}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" disabled={createBusy}>
+                            {editingStudent ? 'Save Student Details' : (createBusy ? 'Creating...' : 'Create Student & Login')}
+                        </button>
                     </>
                 }
             >
+                {!editingStudent && createError && (
+                    <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', color: 'var(--danger)', padding: '0.6rem 0.85rem', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '1rem' }}>
+                        {createError}
+                    </div>
+                )}
                 <div className="form-group">
                     <label className="form-label">Full Name *</label>
                     <input type="text" className="form-control" required value={name} onChange={e => setName(e.target.value)} />
@@ -242,9 +289,38 @@ export const StudentTable = ({ onRefresh }) => {
                     <input type="tel" className="form-control" required maxLength={10} pattern="[0-9]{10}" value={mobile} onChange={e => setMobile(e.target.value.replace(/[^0-9]/g, ''))} placeholder="9876543210" />
                 </div>
                 <div className="form-group">
-                    <label className="form-label">Email Address *</label>
-                    <input type="email" className="form-control" required value={email} onChange={e => setEmail(e.target.value)} />
+                    <label className="form-label">Email Address * {editingStudent ? '(login email)' : '(they will sign in with this)'}</label>
+                    <input
+                        type="email"
+                        className="form-control"
+                        required
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        readOnly={!!editingStudent}
+                        style={editingStudent ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
+                    />
+                    {editingStudent && (
+                        <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                            This is the email the student signs in with, so it cannot be changed here.
+                        </small>
+                    )}
                 </div>
+                {!editingStudent && (
+                    <div className="form-group">
+                        <label className="form-label">Password</label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            value={createPassword}
+                            onChange={e => setCreatePassword(e.target.value)}
+                            placeholder="Leave empty to generate a strong password"
+                            autoComplete="off"
+                        />
+                        <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                            Or type one (at least 8 characters). You will see it once after the account is created.
+                        </small>
+                    </div>
+                )}
                 <div className="form-group">
                     <label className="form-label">Enrollment ID</label>
                     <input type="text" className="form-control" value={enrollmentId} onChange={e => setEnrollmentId(e.target.value)} />
@@ -266,7 +342,7 @@ export const StudentTable = ({ onRefresh }) => {
             <Modal
                 isOpen={!!pwStudent}
                 onClose={closePasswordReset}
-                title={pwResult ? 'New password ready' : 'Reset student password'}
+                title={pwResult ? (pwResult.created ? 'Student account created' : 'New password ready') : 'Reset student password'}
                 subtitle={pwStudent ? `${pwStudent.name || 'Student'} - ${pwStudent.email || ''}` : ''}
                 maxWidth="520px"
                 onSubmit={pwResult ? undefined : handlePasswordReset}
@@ -286,7 +362,9 @@ export const StudentTable = ({ onRefresh }) => {
                 {pwResult ? (
                     <div>
                         <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                            The password for <strong>{pwResult.email || pwStudent?.email}</strong> has been changed. Give the student these login details:
+                            {pwResult.created
+                                ? <>The account for <strong>{pwResult.email || pwStudent?.email}</strong> has been created and can sign in now. Give the student these login details:</>
+                                : <>The password for <strong>{pwResult.email || pwStudent?.email}</strong> has been changed. Give the student these login details:</>}
                         </p>
                         <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.9rem 1rem', marginBottom: '0.75rem' }}>
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Email</div>
@@ -300,8 +378,8 @@ export const StudentTable = ({ onRefresh }) => {
                             </div>
                         </div>
                         <p style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 700 }}>
-                            This is the only time the password is shown - it is not saved anywhere. If it is lost, reset it again.
-                            Any device still signed in with the old password will be signed out within about an hour.
+                            This is the only time the password is shown - it is not saved anywhere. If it is lost, use Reset Password to set a new one.
+                            {!pwResult.created && ' Any device still signed in with the old password will be signed out within about an hour.'}
                         </p>
                     </div>
                 ) : (

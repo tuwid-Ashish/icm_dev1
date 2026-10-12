@@ -21,6 +21,7 @@
  */
 import crypto from 'crypto';
 import { adminAuth, adminDb, requireAdmin } from '../../../lib/firebaseAdmin.js';
+import { describeAuthError } from '../../../lib/authErrors.js';
 
 // No 0/O, 1/l/I — this gets read out over the phone or typed from WhatsApp.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
             target = await adminAuth.getUser(uid);
         } catch (err) {
             if (err.code === 'auth/user-not-found') {
-                res.status(404).json({ error: 'This student has no login account, so there is no password to reset. (Profiles added by hand in the admin screen cannot sign in.)' });
+                res.status(404).json({ error: 'This student has no login account, so there is no password to reset. (Profiles added by hand before the Create Student fix cannot sign in. Create the student again with Create Student Account, which makes a real login.)' });
                 return;
             }
             throw err;
@@ -88,7 +89,10 @@ export default async function handler(req, res) {
 
         res.status(200).json({ success: true, password: newPassword, generated: !chosen, email: target.email || '' });
     } catch (err) {
-        console.error('[admin/reset-password] Failed:', err.code || err.message);
-        res.status(500).json({ error: 'Could not reset the password. Please try again.' });
+        // Log enough to diagnose from the Vercel function log, and tell the admin
+        // the real cause (this route is admin-only) instead of "try again".
+        console.error('[admin/reset-password] Failed:', err.code || '', err.message || err);
+        const d = describeAuthError(err, 'Could not reset the password.');
+        res.status(d.status).json({ error: d.message, detail: d.detail });
     }
 }
