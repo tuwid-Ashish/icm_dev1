@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../common/Modal.jsx';
+import { indexKey } from '../../utils/questionIndex.js';
 
 const COLOR_PRESETS = [
     { label: 'Blue', value: '#3b82f6' },
@@ -17,7 +18,9 @@ const COLOR_PRESETS = [
 
 export const SubjectCodeManager = ({ onRefresh }) => {
     const [subjects, setSubjects] = useState([]);
-    const [questions, setQuestions] = useState([]);
+    // Question totals per subject, from the question index. This screen only
+    // ever needed the counts, but used to load every question to get them.
+    const [questionCounts, setQuestionCounts] = useState({});
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -41,12 +44,12 @@ export const SubjectCodeManager = ({ onRefresh }) => {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [subList, qList] = await Promise.all([
+            const [subList, qStats] = await Promise.all([
                 firestoreEngine.getSubjectCodes(),
-                firestoreEngine.getQuestions('ALL')
+                firestoreEngine.getQuestionStats()
             ]);
             setSubjects(subList || []);
-            setQuestions(qList || []);
+            setQuestionCounts(qStats.counts || {});
         } catch (err) {
             console.error('[SubjectCodeManager] Error loading subjects:', err);
         } finally {
@@ -59,13 +62,7 @@ export const SubjectCodeManager = ({ onRefresh }) => {
     }, []);
 
     // Compute question count per subject code
-    const getQuestionCountForCode = (subjectCode) => {
-        const c = (subjectCode || '').toUpperCase();
-        return questions.filter(q => {
-            const qCode = (q.subjectCode || '').toUpperCase();
-            return qCode === c || (q.subject && q.subject.toLowerCase() === subjectCode.toLowerCase());
-        }).length;
-    };
+    const getQuestionCountForCode = (subjectCode) => questionCounts[indexKey(subjectCode)] || 0;
 
     const handleOpenEditModal = (subject = null) => {
         setErrorMessage('');

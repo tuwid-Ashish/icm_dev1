@@ -8,6 +8,7 @@ import { storageService } from './storageService.js';
 import { getExamAccess } from '../utils/examAccess.js';
 import { EXAM_ID_TO_BATCH } from '../constants/examBatches.js';
 import { resolveSubjectCode } from '../constants/subjectCodes.js';
+import { indexKey } from '../utils/questionIndex.js';
 
 class ExamEngine {
     /**
@@ -47,9 +48,124 @@ class ExamEngine {
             === String(blueprintSubjectCode).trim().toUpperCase();
     }
 
+    /**
+     * The batch rule: when an exam names a question batch, a question counts
+     * only if it is tagged for all batches or for that one. (Every question in
+     * the bank is currently tagged for all batches, so this excludes nothing;
+     * it is kept so tagging questions per batch would still work.)
+     */
+    questionInBatch(q, targetBatch) {
+        if (!targetBatch) return true;
+        if (Array.isArray(q.batches)) {
+            if (q.batches.includes('ALL') || q.batches.includes('All Batches')) return true;
+            return q.batches.includes(targetBatch);
+        }
+        if (q.batch) {
+            const parts = String(q.batch).split(',').map(b => b.trim());
+            if (parts.some(p => p.toLowerCase() === 'all')) return true;
+            return parts.includes(targetBatch);
+        }
+        return false;
+    }
+
+    /**
+     * Chooses `wanted` random questions from a list of question ids by fetching
+     * ONLY the chosen ones, instead of reading the whole bank to pick from it.
+     *
+     * Asks for a few more than needed so an index entry that has gone stale (a
+     * question whose subject was changed, or that no longer exists) is replaced
+     * without a second round trip; if still short, it takes the next ids.
+     */
+    async pickFromIds(ids, wanted, { subjectCode = null, targetBatch = null } = {}) {
+        const remaining = this.fisherYatesShuffle(ids);
+        const picked = [];
+        let cursor = 0;
+        while (picked.length < wanted && cursor < remaining.length) {
+            const need = wanted - picked.length;
+            const take = Math.min(remaining.length - cursor, need + Math.max(2, Math.ceil(need * 0.1)));
+            const chunk = remaining.slice(cursor, cursor + take);
+            cursor += take;
+            const docs = await firestoreEngine.getQuestionsByIds(chunk);
+            docs.forEach(q => {
+                if (subjectCode && !this.isQuestionMatchingSubject(q, subjectCode)) return;
+                if (!this.questionInBatch(q, targetBatch)) return;
+                picked.push(q);
+            });
+        }
+        return this.fisherYatesShuffle(picked).slice(0, wanted);
+    }
+
+    /**
+     * Builds the paper from the question index: reads the few index documents it
+     * needs (about one per subject), then fetches only the questions chosen.
+     * About 120 reads for a 100-question paper, whatever the size of the bank.
+     * Same selection rules as the full-bank path below.
+     */
+    async buildFromIndex({ exam, subjectFilter, count, blueprintSubjects, targetBatch }) {
+        const shortfalls = [];
+        let generatedQuestions = [];
+
+        if (subjectFilter === 'ALL' && blueprintSubjects) {
+            const totalBlueprintQuestions = blueprintSubjects.reduce((sum, s) => sum + (parseInt(s.questionsCount, 10) || 0), 0);
+            const targetTotalCount = exam.totalQuestions || totalBlueprintQuestions || 20;
+            const scaleRatio = totalBlueprintQuestions > 0 ? (targetTotalCount / totalBlueprintQuestions) : 1;
+
+            const index = await firestoreEngine.getQuestionIndexForSubjects(blueprintSubjects.map(s => s.subjectCode || s.name));
+            const sections = await Promise.all(blueprintSubjects.map(async (s) => {
+                const blueprintCode = s.subjectCode || s.name;
+                const wantedCount = Math.max(1, Math.round((parseInt(s.questionsCount, 10) || 1) * scaleRatio));
+                const sectionLabel = resolveSubjectCode(blueprintCode).name || blueprintCode;
+                const picked = await this.pickFromIds(index[indexKey(blueprintCode)] || [], wantedCount, { subjectCode: blueprintCode, targetBatch });
+
+                // The bank could not fill this section; record it rather than hide it.
+                if (picked.length < wantedCount) {
+                    shortfalls.push({ subjectCode: blueprintCode, subjectName: sectionLabel, wanted: wantedCount, available: picked.length });
+                }
+                return picked.map(q => ({
+                    ...q,
+                    sectionId: blueprintCode,
+                    sectionName: sectionLabel,
+                    marks: s.marksPerQuestion || q.marks || 1
+                }));
+            }));
+            generatedQuestions = sections.flat();
+        } else if (subjectFilter !== 'ALL') {
+            const index = await firestoreEngine.getQuestionIndexForSubjects([subjectFilter]);
+            const targetCount = exam.totalQuestions || parseInt(count, 10) || 20;
+            const resolvedSub = resolveSubjectCode(subjectFilter);
+            const picked = await this.pickFromIds(index[indexKey(subjectFilter)] || [], targetCount, { subjectCode: subjectFilter, targetBatch });
+            generatedQuestions = picked.map(q => ({
+                ...q,
+                sectionId: resolvedSub.code,
+                sectionName: resolvedSub.name,
+                marks: q.marks || 1
+            }));
+        } else {
+            const all = await firestoreEngine.getAllQuestionIndex();
+            generatedQuestions = await this.pickFromIds(Object.values(all).flat(), exam.totalQuestions || 20, { targetBatch });
+        }
+
+        return { generatedQuestions, shortfalls };
+    }
+
+    /**
+     * Tries the index. Returns null — and the caller reads the whole bank, as it
+     * always did — when the index is not built yet or cannot be read, so the
+     * index can only ever make a paper cheaper, never prevent one.
+     */
+    async tryBuildFromIndex(args) {
+        try {
+            const meta = await firestoreEngine.getQuestionIndexMeta();
+            if (!meta || !meta.built) return null;
+            return await this.buildFromIndex(args);
+        } catch (err) {
+            console.warn('[ExamEngine] Question index unavailable, reading the whole bank instead:', err.message);
+            return null;
+        }
+    }
+
     async generatePracticeTest(studentId, examId, subjectFilter = 'ALL', count = 20, studentInfo = {}) {
-        const exams = await firestoreEngine.getExams();
-        const exam = exams.find(e => e.id === examId);
+        const exam = await firestoreEngine.getExamById(examId);
         if (!exam) {
             return { error: 'Invalid exam selected.' };
         }
@@ -65,10 +181,30 @@ class ExamEngine {
             return { error: message };
         }
 
+        let generatedQuestions = [];
+        // Sections the question bank could not fill. Reported on the session
+        // rather than thrown, so a thin paper still runs but is never silent.
+        const shortfalls = [];
+
+        const targetBatch = exam.questionBatch || EXAM_ID_TO_BATCH[exam.id];
+        // Blueprint-driven: strictly obeys the exam blueprint set in the admin
+        // section (exam.subjects), so subjects not in it are left out.
+        const blueprintSubjects = exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0
+            ? exam.subjects
+            : null;
+
+        // Fast path: pick ids from the question index and fetch only the chosen
+        // questions (~120 reads). Falls through to the full-bank read below when
+        // the index is not built or cannot be read.
+        const indexed = await this.tryBuildFromIndex({ exam, subjectFilter, count, blueprintSubjects, targetBatch });
+
+        if (indexed) {
+            generatedQuestions = indexed.generatedQuestions;
+            shortfalls.push(...indexed.shortfalls);
+        } else {
         const allQuestions = await firestoreEngine.getQuestions();
 
         // 1. Filter Questions for the target Exam Batch
-        const targetBatch = exam.questionBatch || EXAM_ID_TO_BATCH[exam.id];
         let batchQuestions = targetBatch
             ? allQuestions.filter(q => {
                 if (Array.isArray(q.batches)) {
@@ -88,18 +224,7 @@ class ExamEngine {
             batchQuestions = allQuestions;
         }
 
-        let generatedQuestions = [];
-        // Sections the question bank could not fill. Reported on the session
-        // rather than thrown, so a thin paper still runs but is never silent.
-        const shortfalls = [];
-
-        // 🌟 2. Blueprint-Driven Subject Selection Engine
-        // Strictly obeys the Exam Blueprint configuration configured in the Admin Section (exam.subjects).
-        // Filters out any unassigned or non-blueprint subjects (e.g. English is excluded for Police Bharti).
-        const blueprintSubjects = exam.subjects && Array.isArray(exam.subjects) && exam.subjects.length > 0
-            ? exam.subjects
-            : null;
-
+        // 2. Blueprint-driven subject selection (full-bank path)
         if (subjectFilter === 'ALL' && blueprintSubjects) {
             const totalBlueprintQuestions = blueprintSubjects.reduce((sum, s) => sum + (parseInt(s.questionsCount, 10) || 0), 0);
             // No hard ceiling. This was Math.min(..., 100), which did not just
@@ -167,6 +292,7 @@ class ExamEngine {
             const selectedCount = Math.min(exam.totalQuestions || 20, shuffled.length);
             generatedQuestions = shuffled.slice(0, selectedCount);
         }
+        } // end of full-bank fallback
 
         if (generatedQuestions.length === 0) {
             return { error: `No question paper items found for selected subject or exam blueprint. Please check Question Bank.` };

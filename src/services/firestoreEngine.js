@@ -13,11 +13,17 @@ import {
     writeBatch,
     query,
     where,
+    limit,
+    startAfter,
+    documentId,
+    arrayUnion,
+    arrayRemove,
     getCountFromServer
 } from './firebase.js';
 
 import { storageService } from './storageService.js';
 import { resolveSubjectCode, DEFAULT_SUBJECT_CODES, setDynamicSubjectCodes } from '../constants/subjectCodes.js';
+import { INDEX_COLLECTION, INDEX_META_ID, indexKey } from '../utils/questionIndex.js';
 
 /**
  * Combines the built-in M1-M9 defaults with whatever is in the local cache,
@@ -145,7 +151,23 @@ export const firestoreEngine = {
         return [];
     },
 
+    // 1b. One exam by id — one read, instead of reading every exam to find one.
+    getExamById: async (examId) => {
+        if (!examId || !isFirebaseConnected || !db) return null;
+        try {
+            const snap = await getDoc(doc(db, 'exams', String(examId)));
+            return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+        } catch (err) {
+            console.error('[Firestore Engine] Error fetching exam:', err.message);
+            return null;
+        }
+    },
+
     // 2. Fetch Questions (Source of Truth: Firestore 'questions' collection)
+    //
+    // Reads EVERY question — one read each. Used only as the fallback while the
+    // question index is not built, and by the index rebuild. Papers and admin
+    // screens use the index and the paged/by-id readers below instead.
     getQuestions: async (batchFilter = null) => {
         if (isFirebaseConnected && db) {
             try {
@@ -199,6 +221,158 @@ export const firestoreEngine = {
         return counts;
     },
 
+    // ---- Question index (see src/utils/questionIndex.js) ---------------------
+
+    // Is the index built and complete? One read. null when it is not.
+    getQuestionIndexMeta: async () => {
+        if (!isFirebaseConnected || !db) return null;
+        try {
+            const snap = await getDoc(doc(db, INDEX_COLLECTION, INDEX_META_ID));
+            return snap.exists() ? snap.data() : null;
+        } catch (err) {
+            console.error('[Firestore Engine] Could not read the question index status:', err.message);
+            return null;
+        }
+    },
+
+    // The question ids for the given subjects — one read per subject.
+    // Throws on failure so the paper builder can fall back to the full bank.
+    getQuestionIndexForSubjects: async (codes) => {
+        const keys = [...new Set((codes || []).map(indexKey))];
+        const snaps = await Promise.all(keys.map(k => getDoc(doc(db, INDEX_COLLECTION, k))));
+        const out = {};
+        snaps.forEach((snap, i) => { out[keys[i]] = snap.exists() ? (snap.data().ids || []) : []; });
+        return out;
+    },
+
+    // Every subject's ids — one read per subject (about ten reads in all).
+    getAllQuestionIndex: async () => {
+        const snap = await getDocs(collection(db, INDEX_COLLECTION));
+        const out = {};
+        snap.docs.forEach(d => { if (d.id !== INDEX_META_ID) out[d.id] = d.data().ids || []; });
+        return out;
+    },
+
+    // How many questions there are, in total and per subject, without reading
+    // them. Falls back to reading the bank once only while the index is unbuilt.
+    getQuestionStats: async () => {
+        const meta = await firestoreEngine.getQuestionIndexMeta();
+        if (meta && meta.built) {
+            try {
+                const index = await firestoreEngine.getAllQuestionIndex();
+                const counts = {};
+                let total = 0;
+                Object.entries(index).forEach(([code, ids]) => { counts[code] = ids.length; total += ids.length; });
+                return { source: 'index', total, counts, builtAt: meta.builtAt || null };
+            } catch (err) {
+                console.error('[Firestore Engine] Could not read the question index:', err.message);
+            }
+        }
+        const all = await firestoreEngine.getQuestions('ALL');
+        const counts = {};
+        all.forEach(q => { const k = indexKey(q.subjectCode); counts[k] = (counts[k] || 0) + 1; });
+        // `questions` is returned in this fallback only, so a screen that needs the
+        // whole bank while the index is unbuilt does not have to read it a second time.
+        return { source: 'full', total: all.length, counts, builtAt: null, questions: all };
+    },
+
+    // Totals for the Overview without reading the documents: Firestore counts
+    // them on its side and bills about one read per 1,000 counted. (Reading every
+    // student and every attempt just to show two numbers cost one read each, and
+    // grew with every user and every test.)
+    countStudents: async () => {
+        if (!isFirebaseConnected || !db) return 0;
+        try {
+            const snap = await getCountFromServer(query(collection(db, 'users'), where('role', '==', 'student')));
+            return snap.data().count;
+        } catch (err) {
+            console.error('[Firestore Engine] Could not count students:', err.message);
+            return 0;
+        }
+    },
+
+    countAttempts: async () => {
+        if (!isFirebaseConnected || !db) return 0;
+        try {
+            const snap = await getCountFromServer(collection(db, 'test_attempts'));
+            return snap.data().count;
+        } catch (err) {
+            console.error('[Firestore Engine] Could not count test attempts:', err.message);
+            return 0;
+        }
+    },
+
+    // Fetch specific questions by id — one read per question returned.
+    // Firestore accepts 30 ids per `in` query, so they go in chunks of 30.
+    getQuestionsByIds: async (ids) => {
+        const unique = [...new Set(ids || [])];
+        const chunks = [];
+        for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+        const results = await Promise.all(chunks.map(async (chunk) => {
+            const snap = await getDocs(query(collection(db, 'questions'), where(documentId(), 'in', chunk)));
+            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }));
+        return results.flat();
+    },
+
+    getQuestionById: async (questionId) => {
+        if (!questionId || !isFirebaseConnected || !db) return null;
+        try {
+            const snap = await getDoc(doc(db, 'questions', String(questionId).trim()));
+            return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+        } catch (err) {
+            console.error('[Firestore Engine] Could not look up question:', err.message);
+            return null;
+        }
+    },
+
+    // One page of questions for the admin screens: reads only the page, not the
+    // bank. Ordered by document id, which needs no extra index.
+    getQuestionPage: async ({ subjectCode = null, pageSize = 50, cursor = null } = {}) => {
+        if (!isFirebaseConnected || !db) return { questions: [], cursor: null, hasMore: false };
+        const constraints = [];
+        if (subjectCode && subjectCode !== 'ALL') constraints.push(where('subjectCode', '==', subjectCode));
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(pageSize));
+        const snap = await getDocs(query(collection(db, 'questions'), ...constraints));
+        return {
+            questions: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+            cursor: snap.docs.length ? snap.docs[snap.docs.length - 1] : null,
+            hasMore: snap.docs.length === pageSize
+        };
+    },
+
+    // Recompute the whole index from the questions. Reads every question once
+    // (that is the cost), so it is for first-time setup or repair, not routine.
+    rebuildQuestionIndex: async () => {
+        if (!isFirebaseConnected || !db) throw new Error('Firestore database is not connected.');
+        const bank = await getDocs(collection(db, 'questions'));
+        const byKey = {};
+        bank.docs.forEach(d => {
+            const key = indexKey(d.data().subjectCode);
+            (byKey[key] ||= []).push(d.id);
+        });
+
+        const existing = await getDocs(collection(db, INDEX_COLLECTION));
+        const now = new Date().toISOString();
+        const batch = writeBatch(db);
+        Object.entries(byKey).forEach(([key, ids]) => {
+            // set() without merge replaces the id list outright, dropping stale entries.
+            batch.set(doc(db, INDEX_COLLECTION, key), { subjectCode: key, ids, updatedAt: now });
+        });
+        existing.docs.forEach(d => {
+            if (d.id !== INDEX_META_ID && !byKey[d.id]) batch.delete(d.ref);
+        });
+        batch.set(doc(db, INDEX_COLLECTION, INDEX_META_ID), {
+            built: true, version: 1, builtAt: now, totalQuestions: bank.size, subjects: Object.keys(byKey).length
+        });
+        await batch.commit();
+
+        const counts = {};
+        Object.entries(byKey).forEach(([key, ids]) => { counts[key] = ids.length; });
+        return { total: bank.size, counts };
+    },
+
     // 3. Save Question (Firestore 'questions' collection)
     saveQuestion: async (questionData) => {
         const qId = questionData.id || 'Q-' + Date.now().toString(36).toUpperCase();
@@ -216,7 +390,26 @@ export const firestoreEngine = {
         if (isFirebaseConnected && db) {
             try {
                 const qRef = doc(db, 'questions', qId);
-                await setDoc(qRef, normalized, { merge: true });
+
+                // The index must follow the question. When an existing question's
+                // subject changes, its id has to leave the OLD subject's index too,
+                // so look up where it was (one read).
+                let previousKey = null;
+                try {
+                    const prev = await getDoc(qRef);
+                    if (prev.exists() && prev.data().subjectCode) previousKey = indexKey(prev.data().subjectCode);
+                } catch { /* if this read fails the save below will surface the real problem */ }
+                const newKey = indexKey(normalized.subjectCode);
+
+                // Question and index change together or not at all.
+                const batch = writeBatch(db);
+                batch.set(qRef, normalized, { merge: true });
+                if (previousKey && previousKey !== newKey) {
+                    batch.set(doc(db, INDEX_COLLECTION, previousKey), { ids: arrayRemove(qId), updatedAt: normalized.updatedAt }, { merge: true });
+                }
+                batch.set(doc(db, INDEX_COLLECTION, newKey), { subjectCode: newKey, ids: arrayUnion(qId), updatedAt: normalized.updatedAt }, { merge: true });
+                await batch.commit();
+
                 console.log('[Firestore Engine] Saved question to Cloud Firestore:', qId);
                 return normalized;
             } catch (err) {
@@ -261,6 +454,18 @@ export const firestoreEngine = {
                         batch.set(qRef, item, { merge: true });
                     });
 
+                    // Add this chunk's ids to their subjects' index documents in the
+                    // same batch (200 questions + a handful of index docs, well under
+                    // the 500-operation limit). An id re-imported under a different
+                    // subject can leave a stale entry in its old subject; paper
+                    // building checks each fetched question's subject and skips such
+                    // entries, and Rebuild index clears them.
+                    const idsByKey = {};
+                    chunk.forEach(item => { (idsByKey[indexKey(item.subjectCode)] ||= []).push(item.id); });
+                    Object.entries(idsByKey).forEach(([key, ids]) => {
+                        batch.set(doc(db, INDEX_COLLECTION, key), { subjectCode: key, ids: arrayUnion(...ids), updatedAt: new Date().toISOString() }, { merge: true });
+                    });
+
                     await batch.commit();
                     totalSaved += chunk.length;
                     if (onProgress) onProgress(totalSaved, normalizedList.length);
@@ -283,7 +488,22 @@ export const firestoreEngine = {
     deleteQuestion: async (questionId) => {
         if (isFirebaseConnected && db) {
             try {
-                await deleteDoc(doc(db, 'questions', questionId));
+                const qRef = doc(db, 'questions', questionId);
+
+                // Remove the id from its subject's index in the same batch.
+                let key = null;
+                try {
+                    const snap = await getDoc(qRef);
+                    if (snap.exists() && snap.data().subjectCode) key = indexKey(snap.data().subjectCode);
+                } catch { /* fall through: the delete below reports any real failure */ }
+
+                const batch = writeBatch(db);
+                batch.delete(qRef);
+                if (key) {
+                    batch.set(doc(db, INDEX_COLLECTION, key), { ids: arrayRemove(questionId), updatedAt: new Date().toISOString() }, { merge: true });
+                }
+                await batch.commit();
+
                 console.log('[Firestore Engine] Deleted question from Firestore:', questionId);
                 return { success: true };
             } catch (err) {

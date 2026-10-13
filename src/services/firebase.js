@@ -13,6 +13,11 @@ import {
   writeBatch as rawWriteBatch,
   query,
   where,
+  limit,
+  startAfter,
+  documentId,
+  arrayUnion,
+  arrayRemove,
   getCountFromServer as rawGetCountFromServer
 } from 'firebase/firestore';
 
@@ -115,5 +120,10 @@ export {
   writeBatch,
   query,
   where,
+  limit,
+  startAfter,
+  documentId,
+  arrayUnion,
+  arrayRemove,
   getCountFromServer
 };

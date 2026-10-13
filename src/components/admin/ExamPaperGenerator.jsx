@@ -4,6 +4,7 @@ import { MathRenderer } from '../common/MathRenderer.jsx';
 import { EXAM_BATCHES } from '../../constants/examBatches.js';
 import { looksLikeMathContent } from '../../utils/mathContent.js';
 import { resolveSubjectCode } from '../../constants/subjectCodes.js';
+import { indexKey } from '../../utils/questionIndex.js';
 
 // Groups/filters by resolved subject code+name rather than raw q.subject
 // text, so spelling variants ("Maths" vs "Mathematics" vs "गणित") collapse
@@ -13,19 +14,42 @@ const subjectLabel = (q) => {
     return `${r.code} — ${r.name}`;
 };
 
+const shuffled = (list) => {
+    const out = [...list];
+    for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+};
+
+const PAGE_SIZE = 50;
+
 /**
  * Lets an admin filter/sort the question bank and print a paper-formatted
  * exam to PDF (via the browser's own print engine — "Save as PDF" in the
  * print dialog) for offline students. Reuses MathRenderer so math/Marathi
  * text/images render with the exact same fidelity as everywhere else in
  * the app, rather than a screenshot-based PDF library.
+ *
+ * The bank is never loaded as a whole. The subject list and totals come from
+ * the question index, and questions are fetched only when the admin adds them:
+ * "Add N random" fetches just those N, and "Browse" pages through one subject
+ * 50 at a time. (This screen used to read every question — one database read
+ * each — before showing anything.)
  */
 export const ExamPaperGenerator = () => {
+    // The questions fetched so far — what the picker lists and the paper is built from.
     const [questions, setQuestions] = useState([]);
+    const [counts, setCounts] = useState({});
+    // false while the question index is not built: the whole bank is loaded, as before.
+    const [indexMode, setIndexMode] = useState(true);
     const [loading, setLoading] = useState(true);
+    const [busyCode, setBusyCode] = useState(null);
+    const [browse, setBrowse] = useState({});   // { [code]: { cursor, hasMore } }
+    const [notice, setNotice] = useState('');
 
     const [selectedBatches, setSelectedBatches] = useState(['ALL', ...EXAM_BATCHES]);
-    const [selectedSubjects, setSelectedSubjects] = useState([]);
     const [questionTypeFilter, setQuestionTypeFilter] = useState('all');
     const [sortBy, setSortBy] = useState('subject');
     const [questionLimit, setQuestionLimit] = useState('');
@@ -45,31 +69,38 @@ export const ExamPaperGenerator = () => {
     useEffect(() => {
         (async () => {
             setLoading(true);
-            const [loadedQ] = await Promise.all([
-                firestoreEngine.getQuestions('ALL'),
+            const [stats] = await Promise.all([
+                firestoreEngine.getQuestionStats(),
                 firestoreEngine.getSubjectCodes()
             ]);
-            setQuestions(loadedQ || []);
+            setCounts(stats.counts || {});
+            if (stats.source === 'index') {
+                setIndexMode(true);
+            } else {
+                // Index not built yet: use the whole bank (already read once by the
+                // stats call), pre-selected, exactly as this screen always did.
+                setIndexMode(false);
+                const all = stats.questions || [];
+                setQuestions(all);
+                setSelectedIds(new Set(all.map(q => q.id)));
+            }
             setLoading(false);
         })();
     }, []);
 
-
-    const availableSubjects = useMemo(() => {
-        const set = new Set();
-        questions.forEach(q => { 
-            const s = q.subject || q.subjectCode;
-            if (s) set.add(subjectLabel(q)); 
-        });
-        return Array.from(set).sort();
-    }, [questions]);
-
-    // Default to "all subjects selected" whenever available subjects load from Firestore.
-    useEffect(() => {
-        if (availableSubjects.length > 0) {
-            setSelectedSubjects(availableSubjects);
-        }
-    }, [availableSubjects]);
+    const subjectRows = useMemo(() => {
+        return Object.entries(counts)
+            .map(([code, count]) => {
+                const r = resolveSubjectCode(code);
+                return {
+                    code,
+                    count,
+                    label: code === 'OTHER' ? 'OTHER — Unmapped' : `${r.code} — ${r.name}`,
+                    loaded: questions.filter(q => indexKey(q.subjectCode) === code).length
+                };
+            })
+            .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+    }, [counts, questions]);
 
     const toggleInArray = (arr, setArr, value) => {
         if (value === 'ALL') {
@@ -84,36 +115,99 @@ export const ExamPaperGenerator = () => {
         }
     };
 
-    // Candidate pool: everything matching the batch/subject/type filters.
+    const typeMatches = (q) => {
+        const isMathematical = q.questionType === 'mathematical' || looksLikeMathContent(q.text);
+        return questionTypeFilter === 'all' || (questionTypeFilter === 'mathematical' ? isMathematical : !isMathematical);
+    };
+
+    // Candidate pool: the fetched questions matching the batch/type filters.
     const candidateQuestions = useMemo(() => {
         return questions.filter(q => {
             const rawBatches = Array.isArray(q.batches) && q.batches.length > 0
                 ? q.batches
                 : (q.batch ? q.batch.split(/[;,]/) : ['ALL']);
-            
+
             const qBatches = rawBatches.map(b => (b || '').trim().toLowerCase()).filter(Boolean);
 
             const isAllSelected = selectedBatches.includes('ALL') || selectedBatches.length === 0;
-            const batchMatch = isAllSelected || 
-                qBatches.includes('all') || 
+            const batchMatch = isAllSelected ||
+                qBatches.includes('all') ||
                 qBatches.some(b => selectedBatches.some(sb => sb.toLowerCase() === b || b.includes(sb.toLowerCase())));
 
-            const subjectMatch = selectedSubjects.length === 0 || selectedSubjects.includes(subjectLabel(q));
             const isMathematical = q.questionType === 'mathematical' || looksLikeMathContent(q.text);
             const typeMatch = questionTypeFilter === 'all' || (questionTypeFilter === 'mathematical' ? isMathematical : !isMathematical);
-            
-            return batchMatch && subjectMatch && typeMatch;
-        });
-    }, [questions, selectedBatches, selectedSubjects, questionTypeFilter]);
 
-    // Seed the picker with everything once the question bank loads.
-    // Keyed on the loaded bank, NOT on candidateQuestions — candidateQuestions
-    // is recomputed on every batch/subject/type filter change, so depending on
-    // it wiped the admin's hand-picked selection each time they touched a
-    // filter, which is the one thing the filters exist to support.
-    useEffect(() => {
-        setSelectedIds(new Set(questions.map(q => q.id)));
-    }, [questions]);
+            return batchMatch && typeMatch;
+        });
+    }, [questions, selectedBatches, questionTypeFilter]);
+
+    // Fetch N random questions of one subject and add them, selected. Only those
+    // N are read (plus a few spare, so a type filter can still fill the count).
+    const addRandom = async (code, n) => {
+        setBusyCode(code);
+        setNotice('');
+        try {
+            const loadedIds = new Set(questions.map(q => q.id));
+            let picked = [];
+
+            if (indexMode) {
+                const index = await firestoreEngine.getQuestionIndexForSubjects([code]);
+                const pool = shuffled((index[indexKey(code)] || []).filter(id => !loadedIds.has(id)));
+                const spare = questionTypeFilter === 'all' ? 1.2 : 2.5;
+                let cursor = 0;
+                let rounds = 0;
+                while (picked.length < n && cursor < pool.length && rounds < 6) {
+                    const need = n - picked.length;
+                    const take = Math.min(pool.length - cursor, Math.ceil(need * spare) + 2);
+                    const chunk = pool.slice(cursor, cursor + take);
+                    cursor += take;
+                    rounds++;
+                    const docs = await firestoreEngine.getQuestionsByIds(chunk);
+                    docs.forEach(q => { if (indexKey(q.subjectCode) === indexKey(code) && typeMatches(q)) picked.push(q); });
+                }
+                picked = shuffled(picked).slice(0, n);
+                if (picked.length > 0) setQuestions(prev => [...prev, ...picked]);
+            } else {
+                // Whole bank already loaded: choose among the ones not yet selected.
+                picked = shuffled(questions.filter(q => indexKey(q.subjectCode) === indexKey(code) && !selectedIds.has(q.id) && typeMatches(q))).slice(0, n);
+            }
+
+            if (picked.length === 0) {
+                setNotice(`No more matching questions to add for ${code}.`);
+                return;
+            }
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                picked.forEach(q => next.add(q.id));
+                return next;
+            });
+            if (picked.length < n) setNotice(`Only ${picked.length} more matching question${picked.length === 1 ? '' : 's'} found for ${code}.`);
+        } catch (err) {
+            setNotice('Could not fetch questions: ' + (err.message || 'unknown error'));
+        } finally {
+            setBusyCode(null);
+        }
+    };
+
+    // Page through one subject, 50 at a time, adding the questions unselected so
+    // they can be hand-picked.
+    const browseSubject = async (code) => {
+        setBusyCode(code);
+        setNotice('');
+        try {
+            const state = browse[code] || { cursor: null, hasMore: true };
+            const page = await firestoreEngine.getQuestionPage({ subjectCode: code, pageSize: PAGE_SIZE, cursor: state.cursor });
+            setQuestions(prev => {
+                const have = new Set(prev.map(q => q.id));
+                return [...prev, ...page.questions.filter(q => !have.has(q.id))];
+            });
+            setBrowse(prev => ({ ...prev, [code]: { cursor: page.cursor, hasMore: page.hasMore } }));
+        } catch (err) {
+            setNotice('Could not load questions: ' + (err.message || 'unknown error'));
+        } finally {
+            setBusyCode(null);
+        }
+    };
 
     const toggleQuestionSelected = (id) => {
         setSelectedIds(prev => {
@@ -219,13 +313,20 @@ export const ExamPaperGenerator = () => {
                     <div>
                         <h3 className="card-title">Exam Paper Generator</h3>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                            Filter to narrow the pool, hand-pick exactly which questions to include, then download a print-ready PDF for offline students.
+                            Add questions subject by subject (random picks, or browse and hand-pick), then download a print-ready PDF for offline students.
                         </p>
                     </div>
                     <button className="btn btn-primary" onClick={handleDownloadPdf} disabled={finalQuestions.length === 0}>
                         📄 Download PDF ({finalQuestions.length} Questions · {totalMarks} Marks)
                     </button>
                 </div>
+
+                {!loading && !indexMode && (
+                    <div style={{ background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.9rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
+                        <strong>The question index is not built yet,</strong> so this screen loaded the whole question bank ({questions.length} reads).
+                        Build the index from the Question Bank tab to make it load only what you add.
+                    </div>
+                )}
 
                 <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                     💡 In the print dialog: set Destination to "Save as PDF", and turn off "Headers and footers" (in More Settings) — that setting is what prints the URL/date/page-number line, and it's controlled by your browser, not this page.
@@ -245,6 +346,54 @@ export const ExamPaperGenerator = () => {
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label className="form-label">Instructions</label>
                     <textarea className="form-control" style={{ minHeight: '60px' }} value={instructions} onChange={e => setInstructions(e.target.value)} />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <span>Subjects — add questions</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 400, fontSize: '0.82rem' }}>
+                            Random picks add
+                            <input
+                                type="number" min="1" className="form-control" style={{ width: '4.5rem', padding: '0.25rem 0.5rem' }}
+                                value={quickPickCount}
+                                onChange={e => setQuickPickCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                            />
+                            questions
+                        </span>
+                    </label>
+                    <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                        {loading ? (
+                            <p style={{ padding: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>Loading subjects...</p>
+                        ) : subjectRows.length === 0 ? (
+                            <p style={{ padding: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No questions found.</p>
+                        ) : subjectRows.map(row => (
+                            <div key={row.code} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', padding: '0.5rem 0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+                                <span style={{ flex: '1 1 220px', fontWeight: 700, fontSize: '0.85rem' }}>
+                                    {row.label}
+                                    <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> ({row.count} in the bank · {row.loaded} added)</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => addRandom(row.code, quickPickCount)}
+                                    disabled={busyCode !== null || row.loaded >= row.count}
+                                >
+                                    {busyCode === row.code ? 'Adding...' : `Add ${quickPickCount} random`}
+                                </button>
+                                {indexMode && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => browseSubject(row.code)}
+                                        disabled={busyCode !== null || (browse[row.code] && !browse[row.code].hasMore)}
+                                    >
+                                        {browse[row.code] ? `Browse ${PAGE_SIZE} more` : `Browse ${PAGE_SIZE}`}
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    {notice && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>{notice}</p>}
                 </div>
 
                 <div className="form-grid-2col" style={{ marginBottom: '1rem', alignItems: 'start' }}>
@@ -286,33 +435,6 @@ export const ExamPaperGenerator = () => {
                             ))}
                         </div>
                     </div>
-
-                    <div className="form-group">
-                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Subjects</span>
-                            <span style={{ display: 'flex', gap: '0.4rem' }}>
-                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedSubjects(availableSubjects)}>All</button>
-                                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelectedSubjects([])}>None</button>
-                            </span>
-                        </label>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            {availableSubjects.map(s => (
-                                <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => toggleInArray(selectedSubjects, setSelectedSubjects, s)}
-                                    style={{
-                                        padding: '0.35rem 0.8rem', borderRadius: 'var(--radius-full)', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-                                        border: selectedSubjects.includes(s) ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                                        background: selectedSubjects.includes(s) ? 'var(--primary-light)' : 'var(--bg-surface)',
-                                        color: selectedSubjects.includes(s) ? 'var(--primary)' : 'var(--text-secondary)'
-                                    }}
-                                >
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
                 </div>
 
                 <div className="form-grid-3col" style={{ marginBottom: '1rem' }}>
@@ -340,13 +462,13 @@ export const ExamPaperGenerator = () => {
                             </span>
                         </label>
                         <div style={{ display: 'flex', gap: '0.3rem' }}>
-                            <input 
-                                type="number" 
-                                min="1" 
-                                className="form-control" 
-                                value={questionLimit} 
-                                onChange={e => setQuestionLimit(e.target.value)} 
-                                placeholder="No limit (All)" 
+                            <input
+                                type="number"
+                                min="1"
+                                className="form-control"
+                                value={questionLimit}
+                                onChange={e => setQuestionLimit(e.target.value)}
+                                placeholder="No limit (All)"
                             />
                             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuestionLimit('50')}>50</button>
                             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setQuestionLimit('100')}>100</button>
@@ -363,12 +485,12 @@ export const ExamPaperGenerator = () => {
                                 {finalQuestions.length} Questions in Printable Paper
                             </strong>
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                                ({selectedIds.size} selected from {candidateQuestions.length} available pool · {totalMarks} marks)
+                                ({selectedIds.size} selected from {candidateQuestions.length} added · {totalMarks} marks)
                             </span>
                         </div>
                         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={handleSelectAllCandidates}>
-                                Select All Filtered ({candidateQuestions.length})
+                                Select All Added ({candidateQuestions.length})
                             </button>
                             <button type="button" className="btn btn-sm btn-secondary" onClick={handleDeselectAll}>
                                 Clear Selection
@@ -393,14 +515,13 @@ export const ExamPaperGenerator = () => {
                     )}
                 </div>
 
-                {/* Hand-pick exactly which questions go in, grouped by subject
-                    with per-subject quick actions — the filters above just
-                    narrow this list down to a manageable pool to pick from. */}
+                {/* The questions added so far, grouped by subject, to review and
+                    hand-pick exactly which ones go in. */}
                 <div className="form-group" style={{ marginBottom: '1rem' }}>
                     <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <span>Select Questions</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 400 }}>
-                            Quick-pick
+                            Pick
                             <input
                                 type="number" min="1" className="form-control" style={{ width: '4.5rem', padding: '0.25rem 0.5rem' }}
                                 value={quickPickCount}
@@ -413,13 +534,15 @@ export const ExamPaperGenerator = () => {
                         type="text"
                         className="form-control"
                         style={{ marginBottom: '0.5rem' }}
-                        placeholder="Search question text or subject to narrow this list..."
+                        placeholder="Search the added questions by text or subject..."
                         value={pickerSearch}
                         onChange={e => setPickerSearch(e.target.value)}
                     />
                     <div style={{ maxHeight: '420px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
                         {pickerGroups.length === 0 ? (
-                            <p style={{ padding: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No questions match.</p>
+                            <p style={{ padding: '0.75rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                No questions added yet — use "Add random" or "Browse" on a subject above.
+                            </p>
                         ) : (
                             pickerGroups.map(group => (
                                 <div key={group.subject}>
@@ -479,9 +602,9 @@ export const ExamPaperGenerator = () => {
             {/* Printable Paper Preview */}
             <div className="card exam-paper-print-area" style={{ marginTop: '1.5rem' }}>
                 {loading ? (
-                    <p style={{ color: 'var(--text-muted)' }}>Loading question bank...</p>
+                    <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
                 ) : finalQuestions.length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)' }}>No questions selected — pick some above.</p>
+                    <p style={{ color: 'var(--text-muted)' }}>No questions selected — add some above.</p>
                 ) : (
                     <>
                         <div className="exam-paper-header" style={{ textAlign: 'center', borderBottom: '2px solid var(--border-strong)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>

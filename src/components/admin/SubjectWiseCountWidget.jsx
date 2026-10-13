@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { DEFAULT_SUBJECT_CODES, resolveSubjectCode, getCachedSubjectCodes } from '../../constants/subjectCodes.js';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 
-export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, selectedSubject = 'ALL', customSubjectCodes = null }) => {
+// `counts` ({ M1: 246, M2: 242, ... }) lets a screen show the breakdown without
+// loading any questions: the totals come from the question index (about ten
+// reads). Without it the widget counts the `questions` it is given, as before.
+export const SubjectWiseCountWidget = ({ questions = [], counts = null, onSelectSubject, selectedSubject = 'ALL', customSubjectCodes = null }) => {
+    const usingCounts = counts !== null && counts !== undefined;
     const [selectedBatch, setSelectedBatch] = useState('ALL');
     const [activeSubjectCodes, setActiveSubjectCodes] = useState(customSubjectCodes || getCachedSubjectCodes() || DEFAULT_SUBJECT_CODES);
 
@@ -35,17 +39,26 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
     });
     countsByCode['OTHER'] = 0;
 
-    filteredQuestions.forEach(q => {
-        const resolved = resolveSubjectCode(q.subjectCode || q.subject, activeSubjectCodes);
-        const code = resolved ? resolved.code : 'OTHER';
-        if (countsByCode[code] !== undefined) {
-            countsByCode[code]++;
-        } else {
-            countsByCode['OTHER']++;
-        }
-    });
+    if (usingCounts) {
+        Object.entries(counts).forEach(([code, n]) => {
+            if (code !== 'OTHER' && countsByCode[code] !== undefined) countsByCode[code] = n;
+            else countsByCode['OTHER'] += n;
+        });
+    } else {
+        filteredQuestions.forEach(q => {
+            const resolved = resolveSubjectCode(q.subjectCode || q.subject, activeSubjectCodes);
+            const code = resolved ? resolved.code : 'OTHER';
+            if (countsByCode[code] !== undefined) {
+                countsByCode[code]++;
+            } else {
+                countsByCode['OTHER']++;
+            }
+        });
+    }
 
-    const totalCount = filteredQuestions.length;
+    const totalCount = usingCounts
+        ? Object.values(counts).reduce((sum, n) => sum + n, 0)
+        : filteredQuestions.length;
 
 
     return (
@@ -80,6 +93,7 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
                     </div>
                 </div>
 
+                {!usingCounts && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                         Batch Filter:
@@ -96,6 +110,7 @@ export const SubjectWiseCountWidget = ({ questions = [], onSelectSubject, select
                         <option value="SSC GD">SSC GD</option>
                     </select>
                 </div>
+                )}
             </div>
 
             {/* Grid of Subject Cards (M1 to M9) */}

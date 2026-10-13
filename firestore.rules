@@ -125,6 +125,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Question index: one small document per subject listing its question ids,
+    // so a paper can pick random ids and fetch only those questions instead of
+    // reading the whole bank (see src/utils/questionIndex.js). Public read, like
+    // the questions themselves; only an admin can change it.
+    match /question_index/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();

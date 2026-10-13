@@ -17,7 +17,10 @@ export const AdminDashboardPage = () => {
     const { t } = useLanguage();
     // Tabs: 'overview' | 'students' | 'packages' | 'payments' | 'questions' | 'subject_codes' | 'exams' | 'free_tests' | 'reports' | 'exam_paper'
     const [activeTab, setActiveTab] = useState('overview');
-    const [questions, setQuestions] = useState([]);
+    // Per-subject question totals from the question index — the Overview no
+    // longer loads the questions themselves just to count them.
+    const [questionCounts, setQuestionCounts] = useState({});
+    const [questionsIndexed, setQuestionsIndexed] = useState(false);
     const [subjectCodes, setSubjectCodes] = useState([]);
     const [stats, setStats] = useState({
         totalStudents: 0,
@@ -29,23 +32,24 @@ export const AdminDashboardPage = () => {
     });
 
     const loadStats = async () => {
-        const [qList, eList, sList, pkgList, stdList, subList] = await Promise.all([
-            firestoreEngine.getQuestions('ALL'),
+        const [qStats, eList, attemptCount, pkgList, studentCount, subList] = await Promise.all([
+            firestoreEngine.getQuestionStats(),
             firestoreEngine.getExams(),
-            firestoreEngine.getSubmissions(),
+            firestoreEngine.countAttempts(),
             firestoreEngine.getPackages(),
-            firestoreEngine.getStudents(),
+            firestoreEngine.countStudents(),
             firestoreEngine.getSubjectCodes()
         ]);
 
-        setQuestions(qList || []);
+        setQuestionCounts(qStats.counts || {});
+        setQuestionsIndexed(qStats.source === 'index');
         setSubjectCodes(subList || []);
         setStats({
-            totalStudents: (stdList || []).length,
-            totalQuestions: (qList || []).length,
+            totalStudents: studentCount,
+            totalQuestions: qStats.total,
             totalExams: (eList || []).length,
             totalPackages: (pkgList || []).length,
-            totalSubmissions: (sList || []).length,
+            totalSubmissions: attemptCount,
             totalSubjects: (subList || []).length
         });
     };
@@ -137,7 +141,7 @@ export const AdminDashboardPage = () => {
             {/* Overview Tab Content */}
             {activeTab === 'overview' && (
                 <div>
-                    <UsageMeter questionCount={stats.totalQuestions} />
+                    <UsageMeter questionCount={stats.totalQuestions} indexed={questionsIndexed} />
 
                     <div className="stats-grid">
                         <div className="stat-card" onClick={() => setActiveTab('students')} style={{ cursor: 'pointer' }}>
@@ -166,9 +170,9 @@ export const AdminDashboardPage = () => {
                     </div>
 
                     {/* 📊 Live Subject-Wise Question Count Window (M1 - M9 Matrix) */}
-                    <SubjectWiseCountWidget 
-                        questions={questions} 
-                        onSelectSubject={() => setActiveTab('questions')} 
+                    <SubjectWiseCountWidget
+                        counts={questionCounts}
+                        onSelectSubject={() => setActiveTab('questions')}
                     />
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>

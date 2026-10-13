@@ -8,14 +8,25 @@ import { MathToolbar } from './MathToolbar.jsx';
 import { looksLikeMathContent } from '../../utils/mathContent.js';
 import { DEFAULT_SUBJECT_CODES, resolveSubjectCode, getCachedSubjectCodes } from '../../constants/subjectCodes.js';
 import { SubjectWiseCountWidget } from './SubjectWiseCountWidget.jsx';
+import { indexKey } from '../../utils/questionIndex.js';
 
 
 export const QuestionBankManager = ({ onRefresh }) => {
+    // Only the pages loaded so far — the bank is never loaded whole. Totals come
+    // from the question index, and the list is fetched 50 at a time.
     const [questions, setQuestions] = useState([]);
+    const [pageCursor, setPageCursor] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [counts, setCounts] = useState({});
+    const [indexSource, setIndexSource] = useState(null);   // 'index' | 'full'
+    const [indexBusy, setIndexBusy] = useState(false);
+    const [indexNotice, setIndexNotice] = useState('');
+    const [lookupResult, setLookupResult] = useState(null);
+    const [lookupMessage, setLookupMessage] = useState('');
     const [subjectCodes, setSubjectCodes] = useState(getCachedSubjectCodes() || DEFAULT_SUBJECT_CODES);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [batchFilter, setBatchFilter] = useState('ALL');
     const [subjectFilter, setSubjectFilter] = useState('ALL');
     const [bulkModalOpen, setBulkModalOpen] = useState(false);
 
@@ -35,7 +46,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
             await firestoreEngine.deleteQuestion(deletingQ.id);
             setDeleteModalOpen(false);
             setDeletingQ(null);
-            await loadQuestions();
+            await refreshAll();
             if (onRefresh) onRefresh();
         } catch (err) {
             alert('Error deleting question: ' + err.message);
@@ -63,27 +74,98 @@ export const QuestionBankManager = ({ onRefresh }) => {
     const [questionType, setQuestionType] = useState('standard');
     const activeMathFieldRef = useRef(null);
 
+    const PAGE_SIZE = 50;
+
+    const loadCounts = async () => {
+        const stats = await firestoreEngine.getQuestionStats();
+        setCounts(stats.counts || {});
+        setIndexSource(stats.source);
+    };
+
+    // First page for the chosen subject (about 50 reads, not the whole bank).
     const loadQuestions = async () => {
         setLoading(true);
-        const [loadedQ, loadedSub] = await Promise.all([
-            firestoreEngine.getQuestions(batchFilter),
-            firestoreEngine.getSubjectCodes()
-        ]);
-        setQuestions(loadedQ || []);
-        if (loadedSub && loadedSub.length > 0) setSubjectCodes(loadedSub);
+        setLookupResult(null);
+        setLookupMessage('');
+        try {
+            const [page, loadedSub] = await Promise.all([
+                firestoreEngine.getQuestionPage({ subjectCode: subjectFilter, pageSize: PAGE_SIZE }),
+                firestoreEngine.getSubjectCodes()
+            ]);
+            setQuestions(page.questions);
+            setPageCursor(page.cursor);
+            setHasMore(page.hasMore);
+            if (loadedSub && loadedSub.length > 0) setSubjectCodes(loadedSub);
+        } catch (err) {
+            console.error('[QuestionBankManager] Could not load questions:', err.message);
+            setQuestions([]);
+            setHasMore(false);
+        }
         setLoading(false);
+    };
+
+    const loadMore = async () => {
+        if (!hasMore || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const page = await firestoreEngine.getQuestionPage({ subjectCode: subjectFilter, pageSize: PAGE_SIZE, cursor: pageCursor });
+            setQuestions(prev => [...prev, ...page.questions]);
+            setPageCursor(page.cursor);
+            setHasMore(page.hasMore);
+        } catch (err) {
+            console.error('[QuestionBankManager] Could not load more questions:', err.message);
+        }
+        setLoadingMore(false);
+    };
+
+    const refreshAll = async () => {
+        await Promise.all([loadQuestions(), loadCounts()]);
     };
 
     useEffect(() => {
         loadQuestions();
-    }, [batchFilter]);
+    }, [subjectFilter]);
+
+    useEffect(() => {
+        loadCounts();
+    }, []);
+
+    // Search only sees the questions loaded so far (the bank is not loaded whole),
+    // so an exact Q.ID can be looked up anywhere in the bank with Enter.
+    const handleLookup = async () => {
+        const id = searchQuery.trim();
+        if (!id) return;
+        const found = await firestoreEngine.getQuestionById(id);
+        if (found) {
+            setLookupResult(found);
+            setLookupMessage('');
+        } else {
+            setLookupResult(null);
+            setLookupMessage(`No question has the exact ID "${id}".`);
+        }
+    };
+
+    const bankTotal = Object.values(counts).reduce((sum, n) => sum + n, 0);
+    const viewTotal = subjectFilter === 'ALL' ? bankTotal : (counts[indexKey(subjectFilter)] || 0);
+
+    const handleRebuildIndex = async () => {
+        if (!window.confirm(`Rebuilding the index reads every question once (about ${bankTotal} reads). Continue?`)) return;
+        setIndexBusy(true);
+        setIndexNotice('');
+        try {
+            const res = await firestoreEngine.rebuildQuestionIndex();
+            setIndexNotice(`Index built: ${res.total} questions across ${Object.keys(res.counts).length} subjects.`);
+            await loadCounts();
+        } catch (err) {
+            setIndexNotice('Could not build the index: ' + err.message);
+        } finally {
+            setIndexBusy(false);
+        }
+    };
 
     let filtered = questions;
-    if (subjectFilter !== 'ALL') {
-        filtered = filtered.filter(item => {
-            const resolved = resolveSubjectCode(item.subjectCode || item.subject, subjectCodes);
-            return (resolved && resolved.code === subjectFilter) || item.subjectCode === subjectFilter;
-        });
+    if (lookupResult) {
+        filtered = [lookupResult, ...filtered.filter(q => q.id !== lookupResult.id)];
     }
     if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -197,7 +279,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
         try {
             await firestoreEngine.saveQuestion(questionData);
             setEditModalOpen(false);
-            await loadQuestions();
+            await refreshAll();
             if (onRefresh) onRefresh();
         } catch (err) {
             console.error('[QuestionBankManager] Error saving question:', err);
@@ -212,10 +294,15 @@ export const QuestionBankManager = ({ onRefresh }) => {
         <div className="card">
             <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h3 className="card-title">Central Question Bank ({filtered.length} Questions)</h3>
+                    <h3 className="card-title">Central Question Bank ({viewTotal} Questions)</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Multi-batch question pool supporting mathematical equations & diagrams.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {indexSource === 'index' && (
+                        <button className="btn btn-secondary" onClick={handleRebuildIndex} disabled={indexBusy} title="Recompute the question index from the questions (reads every question once)">
+                            {indexBusy ? 'Rebuilding...' : 'Rebuild index'}
+                        </button>
+                    )}
                     <button className="btn btn-secondary" onClick={() => setBulkModalOpen(true)}>
                         Google Sheets CSV Upload
                     </button>
@@ -226,12 +313,29 @@ export const QuestionBankManager = ({ onRefresh }) => {
             </div>
 
             {/* 📊 Subject-Wise Question Count Window (Dynamic Subject Matrix) */}
-            <SubjectWiseCountWidget 
-                questions={questions} 
+            <SubjectWiseCountWidget
+                counts={counts}
                 selectedSubject={subjectFilter} 
                 onSelectSubject={setSubjectFilter} 
                 customSubjectCodes={subjectCodes}
             />
+
+            {indexSource === 'full' && (
+                <div style={{ background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', color: 'var(--text-primary)', borderRadius: 'var(--radius-md)', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.88rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    <span>
+                        <strong>The question index is not built yet.</strong> Until it is, every test paper and admin screen reads the
+                        whole question bank ({bankTotal} reads each time) instead of only the questions it needs.
+                    </span>
+                    <button className="btn btn-primary btn-sm" onClick={handleRebuildIndex} disabled={indexBusy}>
+                        {indexBusy ? 'Building...' : 'Build index now'}
+                    </button>
+                </div>
+            )}
+            {indexNotice && (
+                <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0.6rem 1rem', marginBottom: '1rem', fontSize: '0.85rem', fontWeight: 700 }}>
+                    {indexNotice}
+                </div>
+            )}
 
             {/* Filter Bar */}
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -239,9 +343,10 @@ export const QuestionBankManager = ({ onRefresh }) => {
                     type="text" 
                     className="form-control" 
                     style={{ flex: 1.5, minWidth: '220px' }}
-                    placeholder="Search question text, ID or subject..." 
+                    placeholder="Search the questions shown, or paste an exact Q.ID and press Enter..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLookup(); } }}
                 />
 
                 <select 
@@ -258,19 +363,13 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 </select>
 
 
-                <select 
-                    className="form-control" 
-                    value={batchFilter}
-                    onChange={e => setBatchFilter(e.target.value)}
-                    style={{ flex: 1, minWidth: '180px' }}
-                >
-                    <option value="ALL">All Exam Batches</option>
-                    <option value="Police Bharti">Police Bharti</option>
-                    <option value="Vanrakshak">Vanrakshak (Forest Guard)</option>
-                    <option value="SSC GD">SSC GD Constable</option>
-                </select>
+                
             </div>
 
+
+            {lookupMessage && (
+                <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: 'var(--danger)', fontWeight: 700 }}>{lookupMessage}</div>
+            )}
 
             <div className="table-wrapper">
                 <table className="data-table">
@@ -292,7 +391,7 @@ export const QuestionBankManager = ({ onRefresh }) => {
                         ) : filtered.length === 0 ? (
                             <tr><td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No questions match your filter.</td></tr>
                         ) : (
-                            filtered.slice(0, 30).map(q => (
+                            filtered.map(q => (
                                 <tr key={q.id}>
                                     <td><code>{q.id}</code></td>
                                     <td>
@@ -330,10 +429,21 @@ export const QuestionBankManager = ({ onRefresh }) => {
                 </table>
             </div>
 
+            <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                <span>
+                    Showing {filtered.length} of {viewTotal} questions{searchQuery.trim() ? ' (search covers only the questions shown)' : ''}.
+                </span>
+                {hasMore && (
+                    <button className="btn btn-secondary" onClick={loadMore} disabled={loadingMore}>
+                        {loadingMore ? 'Loading...' : `Load ${PAGE_SIZE} more`}
+                    </button>
+                )}
+            </div>
+
             <BulkUploadModal 
                 isOpen={bulkModalOpen} 
                 onClose={() => setBulkModalOpen(false)}
-                onRefresh={loadQuestions}
+                onRefresh={refreshAll}
             />
 
             {/* Single Question Editor Modal with Math & Image Support */}

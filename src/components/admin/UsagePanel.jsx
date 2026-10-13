@@ -46,7 +46,7 @@ function Meter({ label, used, limit }) {
 }
 
 /** The usage card for the Overview tab. */
-export const UsageMeter = ({ questionCount = 0 }) => {
+export const UsageMeter = ({ questionCount = 0, indexed = false }) => {
     const [usage, setUsage] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -76,8 +76,11 @@ export const UsageMeter = ({ questionCount = 0 }) => {
 
     const days = ok ? usage.days.slice(-7) : [];
     const scaleMax = Math.max(FREE_LIMITS.reads, ...days.map(d => d.reads)) * 1.05;
-    const papersPerFreeDay = questionCount > 0 ? Math.floor(FREE_LIMITS.reads / questionCount) : null;
-    const exampleReads = questionCount * 100;
+    // With the question index built, a paper reads only the questions it contains
+    // (about 120 for a 100-question paper); without it, the whole bank is read.
+    const readsPerPaper = indexed ? 120 : questionCount;
+    const papersPerFreeDay = readsPerPaper > 0 ? Math.floor(FREE_LIMITS.reads / readsPerPaper) : null;
+    const exampleReads = readsPerPaper * 100;
 
     return (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
@@ -154,8 +157,18 @@ export const UsageMeter = ({ questionCount = 0 }) => {
             <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.9rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 <strong style={{ color: 'var(--text-primary)' }}>What uses reads</strong>
                 <ul style={{ margin: '0.4rem 0 0 1.1rem', padding: 0, lineHeight: 1.6 }}>
-                    <li>A student starting a test paper: about {questionCount > 0 ? formatNumber(questionCount) : 'as many as there are questions'} reads, because the whole question bank is loaded.</li>
-                    <li>Opening the Overview, Question Bank, Subject Codes or Exam Paper screens: about the same each time.</li>
+                    {indexed ? (
+                        <>
+                            <li>A student starting a test paper: about 120 reads. Only the questions in the paper are loaded, however big the question bank is.</li>
+                            <li>Opening the Overview, Question Bank, Subject Codes or Exam Paper screens: a few dozen reads each time.</li>
+                        </>
+                    ) : (
+                        <>
+                            <li>A student starting a test paper: about {questionCount > 0 ? formatNumber(questionCount) : 'as many as there are questions'} reads, because the whole question bank is loaded.</li>
+                            <li>Opening the Overview, Question Bank, Subject Codes or Exam Paper screens: about the same each time.</li>
+                            <li><strong>The question index is not built yet.</strong> Build it in the Question Bank tab to cut a paper to about 120 reads.</li>
+                        </>
+                    )}
                     <li>Opening Reports: one read for every test ever taken.</li>
                     <li>A student seeing their rank after a test: about 15 reads.</li>
                 </ul>
