@@ -2,27 +2,118 @@ import React, { useState, useEffect } from 'react';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 
+const PAGE_SIZE = 50;
+
+// Firestore reports a missing composite index as 'failed-precondition'.
+const describeError = (err) => (err && err.code === 'failed-precondition'
+    ? 'This view needs a one-time database index that is not ready yet. It takes a few minutes to build. Try again shortly, or choose a different exam or sort.'
+    : 'Could not load the reports. Please try again.');
+
+/**
+ * Every test attempt, newest or best first, 50 at a time. This screen used to
+ * load every attempt ever taken — one database read each, on every visit — and
+ * sort and filter them in the browser, so it got slower and dearer with every
+ * test a student sat. Sorting, the exam filter and search now happen in
+ * Firestore, and only the page on screen is read.
+ */
 export const SystemReportsPage = () => {
     const { t } = useLanguage();
     const [submissions, setSubmissions] = useState([]);
+    const [pageCursor, setPageCursor] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [totalAttempts, setTotalAttempts] = useState(0);
+    const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // Filtering & Sorting States
-    const [searchQuery, setSearchQuery] = useState('');
-    const [examFilter, setExamFilter] = useState('ALL');
-    const [resultFilter, setResultFilter] = useState('ALL');
-    const [sortBy, setSortBy] = useState('score_desc'); // Default: highest score achiever first
+    const [searchInput, setSearchInput] = useState('');
+    const [activeSearch, setActiveSearch] = useState('');    // '' = browsing, not searching
+    const [examFilter, setExamFilter] = useState('ALL');     // an exam id (filtered by Firestore)
+    const [resultFilter, setResultFilter] = useState('ALL'); // applies to the rows loaded
+    const [sortBy, setSortBy] = useState('score_desc');      // Default: highest score achiever first
 
-    const loadSubmissions = async () => {
+    const loadFirstPage = async () => {
         setLoading(true);
-        const loaded = await firestoreEngine.getSubmissions();
-        setSubmissions(loaded);
+        setError('');
+        try {
+            if (activeSearch) {
+                setSubmissions(await firestoreEngine.searchSubmissions(activeSearch));
+                setPageCursor(null);
+                setHasMore(false);
+            } else {
+                const page = await firestoreEngine.getSubmissionsPage({
+                    sort: sortBy,
+                    examId: examFilter === 'ALL' ? null : examFilter,
+                    pageSize: PAGE_SIZE
+                });
+                setSubmissions(page.submissions);
+                setPageCursor(page.cursor);
+                setHasMore(page.hasMore);
+            }
+        } catch (err) {
+            console.error('[SystemReportsPage] Could not load attempts:', err.code || '', err.message);
+            setError(describeError(err));
+            setSubmissions([]);
+            setHasMore(false);
+        }
         setLoading(false);
     };
 
+    const loadMore = async () => {
+        if (!hasMore || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const page = await firestoreEngine.getSubmissionsPage({
+                sort: sortBy,
+                examId: examFilter === 'ALL' ? null : examFilter,
+                pageSize: PAGE_SIZE,
+                cursor: pageCursor
+            });
+            setSubmissions(prev => [...prev, ...page.submissions]);
+            setPageCursor(page.cursor);
+            setHasMore(page.hasMore);
+        } catch (err) {
+            console.error('[SystemReportsPage] Could not load more attempts:', err.message);
+            setError(describeError(err));
+        }
+        setLoadingMore(false);
+    };
+
+    // Reload the first page whenever what is being asked for changes.
     useEffect(() => {
-        loadSubmissions();
+        loadFirstPage();
+    }, [sortBy, examFilter, activeSearch]);
+
+    useEffect(() => {
+        (async () => {
+            const [examList, count] = await Promise.all([firestoreEngine.getExams(), firestoreEngine.countAttempts()]);
+            setExams(examList);
+            setTotalAttempts(count);
+        })();
     }, []);
+
+    const handleRefresh = async () => {
+        setTotalAttempts(await firestoreEngine.countAttempts());
+        await loadFirstPage();
+    };
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setActiveSearch(searchInput.trim());
+    };
+
+    const clearSearch = () => {
+        setSearchInput('');
+        setActiveSearch('');
+    };
+
+    const handleExamChange = (value) => {
+        setExamFilter(value);
+        // With an exam chosen, only the date sorts are available (the exam + date
+        // index); fall back to newest-first if a score sort was selected.
+        if (value !== 'ALL' && sortBy.startsWith('score')) setSortBy('date_desc');
+    };
 
     // Helper to get actual student name instead of raw Firestore/Auth UID
     const getStudentDisplayName = (sub) => {
@@ -44,81 +135,66 @@ export const SystemReportsPage = () => {
         return 'Test Student';
     };
 
-    // Apply filtering
-    let processedSubmissions = submissions.filter(sub => {
-        const studentName = getStudentDisplayName(sub).toLowerCase();
-        const studentEmail = (sub.studentEmail || '').toLowerCase();
-        const query = searchQuery.toLowerCase().trim();
+    // The result filter works on the rows already loaded.
+    const processedSubmissions = submissions.filter(sub =>
+        resultFilter === 'ALL' || (resultFilter === 'QUALIFIED' && sub.passed) || (resultFilter === 'FAILED' && !sub.passed)
+    );
 
-        const matchesQuery = !query || studentName.includes(query) || studentEmail.includes(query);
-        const matchesExam = examFilter === 'ALL' || (sub.examName || '').toLowerCase().includes(examFilter.toLowerCase()) || (sub.examCode || '').toLowerCase().includes(examFilter.toLowerCase());
-        const matchesResult = resultFilter === 'ALL' || (resultFilter === 'QUALIFIED' && sub.passed) || (resultFilter === 'FAILED' && !sub.passed);
+    // A rank is only real when the list is the whole bank sorted by score, from
+    // the top: the first page of a score-sorted, unfiltered list is ranks 1..50
+    // and each further page continues the count. Under any other view the row
+    // position is not a rank.
+    const rankMeaningful = sortBy === 'score_desc' && examFilter === 'ALL' && !activeSearch && resultFilter === 'ALL';
 
-        return matchesQuery && matchesExam && matchesResult;
-    });
-
-    // Apply sorting (Default: Highest score achiever to lowest)
-    processedSubmissions.sort((a, b) => {
-        if (sortBy === 'score_desc') {
-            return (b.finalScore || 0) - (a.finalScore || 0);
-        } else if (sortBy === 'score_asc') {
-            return (a.finalScore || 0) - (b.finalScore || 0);
-        } else if (sortBy === 'date_desc') {
-            return new Date(b.submittedAt) - new Date(a.submittedAt);
-        } else if (sortBy === 'date_asc') {
-            return new Date(a.submittedAt) - new Date(b.submittedAt);
-        }
-        return 0;
-    });
+    const controlLabel = { fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' };
 
     return (
         <div className="card">
             <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h3 className="card-title">{t('audit_log_title')} ({processedSubmissions.length} / {submissions.length})</h3>
+                    <h3 className="card-title">{t('audit_log_title')} ({processedSubmissions.length} shown of {totalAttempts})</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('audit_log_desc')}</p>
                 </div>
-                <button className="btn btn-secondary" onClick={loadSubmissions}>
+                <button className="btn btn-secondary" onClick={handleRefresh}>
                     ↻ {t('refresh_btn') || 'Refresh Audit Log'}
                 </button>
             </div>
 
             {/* Admin Filter & Sorting Bar */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', padding: '1rem', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
-                <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>
-                        Search Student
-                    </label>
-                    <input 
-                        type="text" 
-                        className="form-control"
-                        placeholder={t('search_student_placeholder')}
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                    />
-                </div>
+                <form onSubmit={handleSearch}>
+                    <label style={controlLabel}>Search Student</label>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Email, or the start of the name"
+                            value={searchInput}
+                            onChange={e => setSearchInput(e.target.value)}
+                        />
+                        <button type="submit" className="btn btn-primary btn-sm">Go</button>
+                        {activeSearch && <button type="button" className="btn btn-secondary btn-sm" onClick={clearSearch}>Clear</button>}
+                    </div>
+                </form>
 
                 <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>
-                        Filter by Exam Board
-                    </label>
-                    <select 
+                    <label style={controlLabel}>Filter by Exam</label>
+                    <select
                         className="form-control"
                         value={examFilter}
-                        onChange={e => setExamFilter(e.target.value)}
+                        onChange={e => handleExamChange(e.target.value)}
+                        disabled={!!activeSearch}
                     >
                         <option value="ALL">{t('all_exam_boards')}</option>
-                        <option value="Police">Police Bharti (पोलीस भरती)</option>
-                        <option value="Vanrakshak">Vanrakshak (वनरक्षक भरती)</option>
-                        <option value="SSC">SSC GD (एसएससी जीडी)</option>
+                        {exams.map(e => (
+                            <option key={e.id} value={e.id}>{e.name || e.title || e.id}</option>
+                        ))}
                     </select>
                 </div>
 
                 <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>
-                        Filter by Result
-                    </label>
-                    <select 
+                    <label style={controlLabel}>Filter by Result (rows shown)</label>
+                    <select
                         className="form-control"
                         value={resultFilter}
                         onChange={e => setResultFilter(e.target.value)}
@@ -130,21 +206,34 @@ export const SystemReportsPage = () => {
                 </div>
 
                 <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>
-                        Sort Submissions
-                    </label>
-                    <select 
+                    <label style={controlLabel}>Sort Submissions</label>
+                    <select
                         className="form-control"
                         value={sortBy}
                         onChange={e => setSortBy(e.target.value)}
+                        disabled={!!activeSearch}
                     >
-                        <option value="score_desc">🥇 {t('sort_highest_score')}</option>
-                        <option value="score_asc">📉 {t('sort_lowest_score')}</option>
+                        <option value="score_desc" disabled={examFilter !== 'ALL'}>🥇 {t('sort_highest_score')}</option>
+                        <option value="score_asc" disabled={examFilter !== 'ALL'}>📉 {t('sort_lowest_score')}</option>
                         <option value="date_desc">📅 {t('sort_newest_date')}</option>
                         <option value="date_asc">⏳ {t('sort_oldest_date')}</option>
                     </select>
                 </div>
             </div>
+
+            {activeSearch && (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                    Showing attempts matching &quot;{activeSearch}&quot;, newest first. Clear the search to browse everything again.
+                </p>
+            )}
+            {examFilter !== 'ALL' && !activeSearch && (
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                    With one exam chosen the list can be sorted by date only.
+                </p>
+            )}
+            {error && (
+                <p style={{ fontSize: '0.85rem', color: 'var(--danger)', fontWeight: 700, marginBottom: '0.75rem' }}>{error}</p>
+            )}
 
             <div className="table-wrapper">
                 <table className="data-table">
@@ -169,14 +258,13 @@ export const SystemReportsPage = () => {
                         ) : (
                             processedSubmissions.map((sub, index) => {
                                 const rank = index + 1;
-                                const isTopScoreSort = sortBy === 'score_desc';
                                 return (
-                                    <tr key={sub.id} style={{ background: isTopScoreSort && rank === 1 ? 'rgba(234, 88, 12, 0.05)' : 'transparent' }}>
+                                    <tr key={sub.id} style={{ background: rankMeaningful && rank === 1 ? 'rgba(234, 88, 12, 0.05)' : 'transparent' }}>
                                         <td style={{ textAlign: 'center', fontWeight: 800 }}>
-                                            {/* A rank only means something when the list is sorted by score. Under
-                                                any other sort, `index + 1` is just a row number — sorting by date made
-                                                the newest submission show as "#1". */}
-                                            {!isTopScoreSort ? '—' : rank === 1 ? '🥇 #1' : rank === 2 ? '🥈 #2' : rank === 3 ? '🥉 #3' : `#${rank}`}
+                                            {/* A rank only means something for an unfiltered list sorted by
+                                                score from the top. Under any other view, `index + 1` is just a
+                                                row number — sorting by date made the newest submission "#1". */}
+                                            {!rankMeaningful ? '—' : rank === 1 ? '🥇 #1' : rank === 2 ? '🥈 #2' : rank === 3 ? '🥉 #3' : `#${rank}`}
                                         </td>
                                         <td>
                                             <strong>{getStudentDisplayName(sub)}</strong><br />
@@ -203,6 +291,17 @@ export const SystemReportsPage = () => {
                     </tbody>
                 </table>
             </div>
+
+            {!activeSearch && (
+                <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    <span>Showing {submissions.length} attempts{examFilter === 'ALL' ? ` of ${totalAttempts}` : ' for this exam'}.</span>
+                    {hasMore && (
+                        <button className="btn btn-secondary" onClick={loadMore} disabled={loadingMore}>
+                            {loadingMore ? 'Loading...' : `Load ${PAGE_SIZE} more`}
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

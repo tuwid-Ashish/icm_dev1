@@ -36,7 +36,11 @@ export const PaymentsPanel = () => {
 
     // Assign dialog
     const [assigning, setAssigning] = useState(null);
-    const [students, setStudents] = useState(null);
+    // The student picker never loads everyone: it starts with the suggested student
+    // (if any) and finds others by searching.
+    const [students, setStudents] = useState([]);
+    const [searchHits, setSearchHits] = useState(null);
+    const [searching, setSearching] = useState(false);
     const [search, setSearch] = useState('');
     const [chosenUid, setChosenUid] = useState('');
     const [busy, setBusy] = useState(false);
@@ -70,26 +74,36 @@ export const PaymentsPanel = () => {
         return true;
     });
 
-    const openAssign = async (row) => {
+    const openAssign = (row) => {
         setAssigning(row);
         setChosenUid(row.suggested ? row.suggested.uid : '');
         setSearch('');
+        setSearchHits(null);
         setDialogError('');
-        if (!students) {
-            try { setStudents(await firestoreEngine.getStudents()); }
-            catch { setDialogError('Could not load the student list.'); }
-        }
+        setStudents(row.suggested ? [{ ...row.suggested, id: row.suggested.uid }] : []);
     };
 
-    const matches = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const list = students || [];
-        const filtered = !q ? list : list.filter(s =>
-            (s.name || '').toLowerCase().includes(q) ||
-            (s.email || '').toLowerCase().includes(q) ||
-            String(s.mobile || '').includes(q));
-        return filtered.slice(0, 40);
-    }, [students, search]);
+    // Search as the admin types (after a short pause), server-side, instead of
+    // downloading every student to filter in the browser.
+    useEffect(() => {
+        const term = search.trim();
+        if (!assigning || term.length < 2) { setSearchHits(null); return undefined; }
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const hits = await firestoreEngine.searchStudents(term);
+                if (!cancelled) setSearchHits(hits);
+            } catch {
+                if (!cancelled) setDialogError('The student search failed. Please try again.');
+            }
+            if (!cancelled) setSearching(false);
+        }, 400);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [search, assigning]);
+
+    // What the list shows: search results once the admin types, else the suggestion.
+    const matches = searchHits !== null ? searchHits : students;
 
     const confirmAssign = async () => {
         if (!assigning || !chosenUid) return;
@@ -107,7 +121,7 @@ export const PaymentsPanel = () => {
         }
     };
 
-    const chosen = (students || []).find(s => (s.uid || s.id) === chosenUid) || (assigning && assigning.suggested && assigning.suggested.uid === chosenUid ? assigning.suggested : null);
+    const chosen = [...(searchHits || []), ...students].find(s => (s.uid || s.id) === chosenUid) || (assigning && assigning.suggested && assigning.suggested.uid === chosenUid ? assigning.suggested : null);
 
     return (
         <div className="card">
@@ -258,7 +272,7 @@ export const PaymentsPanel = () => {
                             style={{ marginBottom: '0.6rem' }}
                         />
                         <div style={{ maxHeight: '210px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-                            {students === null && !dialogError && <div style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>Loading students…</div>}
+                            {searching && <div style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>Searching…</div>}
                             {matches.map(s => {
                                 const uid = s.uid || s.id;
                                 return (
@@ -271,7 +285,11 @@ export const PaymentsPanel = () => {
                                     </label>
                                 );
                             })}
-                            {students && matches.length === 0 && <div style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>No students match.</div>}
+                            {!searching && matches.length === 0 && (
+                                <div style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {search.trim().length >= 2 ? 'No students match.' : 'Type at least 2 letters of the name, the email, or the 10-digit mobile number to find a student.'}
+                                </div>
+                            )}
                         </div>
 
                         {chosen && (

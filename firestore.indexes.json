@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "test_attempts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "examId", "order": "ASCENDING" },
+        { "fieldPath": "submittedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

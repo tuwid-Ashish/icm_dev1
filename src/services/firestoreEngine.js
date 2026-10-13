@@ -15,6 +15,7 @@ import {
     where,
     limit,
     startAfter,
+    orderBy,
     documentId,
     arrayUnion,
     arrayRemove,
@@ -584,6 +585,96 @@ export const firestoreEngine = {
         return [];
     },
 
+    // 6b. Paged and searchable student list for the admin screens.
+    //
+    // getStudents() above reads EVERY account — one read each, on every visit,
+    // and growing with every sign-up. These read 50 at a time (newest first) and
+    // find one student by email, mobile number or the start of their name.
+    getStudentPage: async ({ pageSize = 50, cursor = null } = {}) => {
+        if (!isFirebaseConnected || !db) return { students: [], cursor: null, hasMore: false };
+        const constraints = [orderBy('createdAt', 'desc')];
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(pageSize));
+        const snap = await getDocs(query(collection(db, 'users'), ...constraints));
+        return {
+            // Admin accounts live in the same collection; keep them out of the list.
+            students: snap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() })).filter(u => u.role !== 'admin'),
+            cursor: snap.docs.length ? snap.docs[snap.docs.length - 1] : null,
+            hasMore: snap.docs.length === pageSize
+        };
+    },
+
+    // Firestore cannot search inside text, so this matches what an admin has in
+    // hand: an email address, a 10-digit mobile number, or the start of a name
+    // (tried as typed, as Title Case and as lower case, because the match is
+    // case-sensitive). At most 20 results.
+    searchStudents: async (term) => {
+        const t = String(term || '').trim();
+        if (t.length < 2 || !isFirebaseConnected || !db) return [];
+        const users = collection(db, 'users');
+        const queries = [];
+        if (t.includes('@')) {
+            [...new Set([t, t.toLowerCase()])].forEach(v => queries.push(query(users, where('email', '==', v))));
+        } else if (/^\d{10}$/.test(t)) {
+            queries.push(query(users, where('mobile', '==', t)));
+        } else {
+            const titleCase = t.replace(/\b\w/g, c => c.toUpperCase());
+            [...new Set([t, titleCase, t.toLowerCase()])].forEach(v =>
+                queries.push(query(users, where('name', '>=', v), where('name', '<=', v + ''), limit(20))));
+        }
+        const snaps = await Promise.all(queries.map(q => getDocs(q)));
+        const seen = new Map();
+        snaps.forEach(s => s.docs.forEach(d => {
+            if (!seen.has(d.id) && d.data().role !== 'admin') seen.set(d.id, { id: d.id, uid: d.id, ...d.data() });
+        }));
+        return [...seen.values()].slice(0, 20);
+    },
+
+    // 10c. Paged test-attempt list for the Reports screen (50 at a time).
+    //
+    // Sorting happens in Firestore. Filtering by exam as well needs a composite
+    // index (examId + submittedAt); only the date sorts are offered with it
+    // (see firestore.indexes.json). A missing index surfaces as the Firestore
+    // error 'failed-precondition', which the screen explains to the admin.
+    getSubmissionsPage: async ({ sort = 'date_desc', examId = null, pageSize = 50, cursor = null } = {}) => {
+        if (!isFirebaseConnected || !db) return { submissions: [], cursor: null, hasMore: false };
+        const field = sort.startsWith('score') ? 'finalScore' : 'submittedAt';
+        const direction = sort.endsWith('_asc') ? 'asc' : 'desc';
+        const constraints = [];
+        if (examId) constraints.push(where('examId', '==', examId));
+        constraints.push(orderBy(field, direction));
+        if (cursor) constraints.push(startAfter(cursor));
+        constraints.push(limit(pageSize));
+        const snap = await getDocs(query(collection(db, 'test_attempts'), ...constraints));
+        return {
+            submissions: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+            cursor: snap.docs.length ? snap.docs[snap.docs.length - 1] : null,
+            hasMore: snap.docs.length === pageSize
+        };
+    },
+
+    // Find attempts by a student's email (exact) or the start of their name.
+    // Newest first, at most 50.
+    searchSubmissions: async (term) => {
+        const t = String(term || '').trim();
+        if (t.length < 2 || !isFirebaseConnected || !db) return [];
+        const attempts = collection(db, 'test_attempts');
+        const queries = [];
+        if (t.includes('@')) {
+            [...new Set([t, t.toLowerCase()])].forEach(v => queries.push(query(attempts, where('studentEmail', '==', v), limit(50))));
+        } else {
+            const titleCase = t.replace(/\b\w/g, c => c.toUpperCase());
+            [...new Set([t, titleCase, t.toLowerCase()])].forEach(v =>
+                queries.push(query(attempts, where('studentName', '>=', v), where('studentName', '<=', v + ''), limit(50))));
+        }
+        const snaps = await Promise.all(queries.map(q => getDocs(q)));
+        const seen = new Map();
+        snaps.forEach(s => s.docs.forEach(d => { if (!seen.has(d.id)) seen.set(d.id, { id: d.id, ...d.data() }); }));
+        return [...seen.values()]
+            .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))
+            .slice(0, 50);
+    },
+
     // 7. Update Student Quota in Firestore
     updateStudentQuota: async (uid, allowedTests, status = 'active') => {
         const allowedNum = parseInt(allowedTests, 10) || 0;
@@ -639,6 +730,9 @@ export const firestoreEngine = {
             purchasedPackages: existing?.purchasedPackages || [],
             role: 'student',
             status: studentData.status || 'active',
+            // The Students screen lists newest sign-ups first, ordered by this
+            // field; a profile without it would not appear in that list at all.
+            createdAt: existing?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
 

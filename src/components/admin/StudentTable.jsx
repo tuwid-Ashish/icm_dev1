@@ -3,8 +3,18 @@ import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { Modal } from '../common/Modal.jsx';
 
 export const StudentTable = ({ onRefresh }) => {
+    // Students are loaded 50 at a time (newest first) rather than all at once, and
+    // found by search rather than by scrolling a list of everyone.
     const [students, setStudents] = useState([]);
+    const [pageCursor, setPageCursor] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [totalStudents, setTotalStudents] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [searchInput, setSearchInput] = useState('');
+    const [searchResults, setSearchResults] = useState(null);   // null = not searching
+    const [searching, setSearching] = useState(false);
+    const [listError, setListError] = useState('');
 
     const [modalOpen, setModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState(null);
@@ -31,10 +41,64 @@ export const StudentTable = ({ onRefresh }) => {
 
     const loadStudents = async () => {
         setLoading(true);
-        const stdList = await firestoreEngine.getStudents();
-        setStudents(stdList);
+        setListError('');
+        try {
+            const [page, total] = await Promise.all([
+                firestoreEngine.getStudentPage({ pageSize: 50 }),
+                firestoreEngine.countStudents()
+            ]);
+            setStudents(page.students);
+            setPageCursor(page.cursor);
+            setHasMore(page.hasMore);
+            setTotalStudents(total);
+        } catch (err) {
+            console.error('[StudentTable] Could not load students:', err.message);
+            setListError('Could not load the students. Please try again.');
+        }
         setLoading(false);
     };
+
+    const loadMoreStudents = async () => {
+        if (!hasMore || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const page = await firestoreEngine.getStudentPage({ pageSize: 50, cursor: pageCursor });
+            setStudents(prev => [...prev, ...page.students]);
+            setPageCursor(page.cursor);
+            setHasMore(page.hasMore);
+        } catch (err) {
+            console.error('[StudentTable] Could not load more students:', err.message);
+        }
+        setLoadingMore(false);
+    };
+
+    const runSearch = async (e) => {
+        if (e) e.preventDefault();
+        const term = searchInput.trim();
+        if (!term) { setSearchResults(null); return; }
+        setSearching(true);
+        setListError('');
+        try {
+            setSearchResults(await firestoreEngine.searchStudents(term));
+        } catch (err) {
+            console.error('[StudentTable] Search failed:', err.message);
+            setListError('The search failed. Please try again.');
+        }
+        setSearching(false);
+    };
+
+    const clearSearch = () => {
+        setSearchInput('');
+        setSearchResults(null);
+    };
+
+    // After an edit, show fresh data: re-run the search if one is active, else reload the first page.
+    const refreshList = async () => {
+        if (searchResults !== null && searchInput.trim()) await runSearch();
+        else await loadStudents();
+    };
+
+    const shownStudents = searchResults !== null ? searchResults : students;
 
     useEffect(() => {
         loadStudents();
@@ -114,7 +178,7 @@ export const StudentTable = ({ onRefresh }) => {
             allowedTests,
             status
         });
-        await loadStudents();
+        await refreshList();
         setModalOpen(false);
         if (onRefresh) onRefresh();
     };
@@ -167,7 +231,7 @@ export const StudentTable = ({ onRefresh }) => {
         const nextStatus = std.status === 'active' ? 'disabled' : 'active';
         const stdId = std.id || std.uid;
         await firestoreEngine.updateStudentQuota(stdId, std.allowedTests || 0, nextStatus);
-        await loadStudents();
+        await refreshList();
         if (onRefresh) onRefresh();
     };
 
@@ -175,13 +239,38 @@ export const StudentTable = ({ onRefresh }) => {
         <div className="card">
             <div className="card-header" style={{ flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h3 className="card-title">Registered Students & Purchased Packages ({students.length} Accounts)</h3>
+                    <h3 className="card-title">Registered Students & Purchased Packages ({totalStudents} Accounts)</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Manage all registered student accounts, mandatory mobile numbers, and active purchased course packages.</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => handleOpenModal(null)}>
                     + Create Student Account
                 </button>
             </div>
+
+            <form onSubmit={runSearch} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                <input
+                    type="text"
+                    className="form-control"
+                    style={{ flex: 1, minWidth: '240px' }}
+                    placeholder="Find a student by email, 10-digit mobile number, or the start of their name..."
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                />
+                <button type="submit" className="btn btn-primary" disabled={searching}>{searching ? 'Searching...' : 'Search'}</button>
+                {searchResults !== null && (
+                    <button type="button" className="btn btn-secondary" onClick={clearSearch}>Show all</button>
+                )}
+            </form>
+            {searchResults !== null && (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                    {searchResults.length === 0
+                        ? 'No student matches. Try the full email address, the 10-digit mobile number, or the first letters of the name.'
+                        : `${searchResults.length} student${searchResults.length === 1 ? '' : 's'} found.`}
+                </p>
+            )}
+            {listError && (
+                <p style={{ fontSize: '0.85rem', color: 'var(--danger)', fontWeight: 700, marginBottom: '0.75rem' }}>{listError}</p>
+            )}
 
             <div className="table-wrapper">
                 <table className="data-table">
@@ -199,10 +288,10 @@ export const StudentTable = ({ onRefresh }) => {
                     <tbody>
                         {loading ? (
                             <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Loading student accounts from Cloud Firestore...</td></tr>
-                        ) : students.length === 0 ? (
+                        ) : shownStudents.length === 0 ? (
                             <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No student accounts registered yet.</td></tr>
                         ) : (
-                            students.map(s => (
+                            shownStudents.map(s => (
                                 <tr key={s.id || s.uid}>
                                     <td>
                                         <strong>{s.name}</strong><br />
@@ -258,6 +347,17 @@ export const StudentTable = ({ onRefresh }) => {
                     </tbody>
                 </table>
             </div>
+
+            {searchResults === null && (
+                <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    <span>Showing {students.length} of {totalStudents} students, newest first.</span>
+                    {hasMore && (
+                        <button className="btn btn-secondary" onClick={loadMoreStudents} disabled={loadingMore}>
+                            {loadingMore ? 'Loading...' : 'Load 50 more'}
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Quota & Student Modal */}
             <Modal
