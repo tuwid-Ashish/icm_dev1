@@ -3,6 +3,7 @@ import { useExam } from '../../context/ExamContext.jsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
 import { MathRenderer } from '../../components/common/MathRenderer.jsx';
+import { ReportQuestionButton } from '../../components/student/ReportQuestionButton.jsx';
 
 export const TestSimulatorPage = () => {
     const {
@@ -99,7 +100,11 @@ export const TestSimulatorPage = () => {
                 <div className="cbt-q-container">
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 700 }}>
-                            <span>Question {currentQuestionIdx + 1} of {totalQs} ({q.subject || 'General Section'})</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                                Question {currentQuestionIdx + 1} of {totalQs} ({q.subject || 'General Section'})
+                                {/* keyed by question so each question remembers its own reported state */}
+                                <ReportQuestionButton key={q.id} questionId={q.id} examId={activeSession.examId} />
+                            </span>
                             <span>Marks: +{q.marks || 1} | Penalty: -{activeSession.negativeMarkingRate}</span>
                         </div>
 

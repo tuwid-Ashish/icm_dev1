@@ -134,6 +134,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Students' reports of questions that look wrong. Written only by
+    // /api/report-question (which validates and rate-limits them); admins read
+    // the list and mark reports resolved. Students never touch this directly.
+    // (report_limits, its daily counter, has no block: it stays server-only.)
+    match /question_reports/{reportId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin();
+      allow create, delete: if false;
+    }
+
     match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();

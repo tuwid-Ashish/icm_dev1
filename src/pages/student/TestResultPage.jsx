@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
 import { MathRenderer } from '../../components/common/MathRenderer.jsx';
+import { ReportQuestionButton } from '../../components/student/ReportQuestionButton.jsx';
 
 export const TestResultPage = ({ result, onBack }) => {
     const { t } = useLanguage();
@@ -215,7 +216,10 @@ export const TestResultPage = ({ result, onBack }) => {
                     {result.detailedReview.map(q => (
                         <div key={q.id} style={{ background: 'var(--bg-subtle)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <strong>{t('question_prefix')} {q.questionNumber}: {q.sectionName}</strong>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                                    <strong>{t('question_prefix')} {q.questionNumber}: {q.sectionName}</strong>
+                                    <ReportQuestionButton questionId={q.id} examId={result.examId} />
+                                </span>
                                 <span className={`badge ${q.status === 'correct' ? 'badge-success' : q.status === 'wrong' ? 'badge-danger' : 'badge-warning'}`}>
                                     {q.status.toUpperCase()} ({q.isCorrect ? '+' + q.marks : q.status === 'wrong' ? '-' + result.negativeDeduction : '0'})
                                 </span>

@@ -8,6 +8,7 @@ import { PackageManager } from '../../components/admin/PackageManager.jsx';
 import { SystemReportsPage } from './SystemReportsPage.jsx';
 import { ExamPaperGenerator } from '../../components/admin/ExamPaperGenerator.jsx';
 import { PaymentsPanel } from '../../components/admin/PaymentsPanel.jsx';
+import { ReportedQuestionsPanel } from '../../components/admin/ReportedQuestionsPanel.jsx';
 import { UsageMeter, UsageBanner } from '../../components/admin/UsagePanel.jsx';
 import { SubjectWiseCountWidget } from '../../components/admin/SubjectWiseCountWidget.jsx';
 import { firestoreEngine } from '../../services/firestoreEngine.js';
@@ -21,6 +22,10 @@ export const AdminDashboardPage = () => {
     // longer loads the questions themselves just to count them.
     const [questionCounts, setQuestionCounts] = useState({});
     const [questionsIndexed, setQuestionsIndexed] = useState(false);
+    // Open reports from students, shown on the tab; and the question the Reported
+    // tab has asked the Question Bank to open for editing.
+    const [openReports, setOpenReports] = useState(0);
+    const [focusQuestionId, setFocusQuestionId] = useState(null);
     const [subjectCodes, setSubjectCodes] = useState([]);
     const [stats, setStats] = useState({
         totalStudents: 0,
@@ -32,15 +37,17 @@ export const AdminDashboardPage = () => {
     });
 
     const loadStats = async () => {
-        const [qStats, eList, attemptCount, pkgList, studentCount, subList] = await Promise.all([
+        const [qStats, eList, attemptCount, pkgList, studentCount, subList, reportCount] = await Promise.all([
             firestoreEngine.getQuestionStats(),
             firestoreEngine.getExams(),
             firestoreEngine.countAttempts(),
             firestoreEngine.getPackages(),
             firestoreEngine.countStudents(),
-            firestoreEngine.getSubjectCodes()
+            firestoreEngine.getSubjectCodes(),
+            firestoreEngine.countOpenQuestionReports()
         ]);
 
+        setOpenReports(reportCount);
         setQuestionCounts(qStats.counts || {});
         setQuestionsIndexed(qStats.source === 'index');
         setSubjectCodes(subList || []);
@@ -99,6 +106,12 @@ export const AdminDashboardPage = () => {
                     onClick={() => setActiveTab('payments')}
                 >
                     {t('tab_payments')}
+                </button>
+                <button
+                    className={`btn ${activeTab === 'reported' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setActiveTab('reported')}
+                >
+                    {t('tab_reported')}{openReports > 0 ? ` (${openReports})` : ''}
                 </button>
                 <button 
                     className={`btn ${activeTab === 'questions' ? 'btn-primary' : 'btn-secondary'}`}
@@ -162,6 +175,12 @@ export const AdminDashboardPage = () => {
                             <div className="stat-sub">Multi-Select Batch Checkboxes</div>
                         </div>
 
+                        <div className="stat-card" onClick={() => setActiveTab('reported')} style={{ cursor: 'pointer' }}>
+                            <div className="stat-title">Reported Questions</div>
+                            <div className="stat-val" style={{ color: openReports > 0 ? 'var(--danger)' : 'var(--success)' }}>{openReports}</div>
+                            <div className="stat-sub">{openReports > 0 ? 'Flagged by students — need a look' : 'Nothing flagged right now'}</div>
+                        </div>
+
                         <div className="stat-card" onClick={() => setActiveTab('exams')} style={{ cursor: 'pointer' }}>
                             <div className="stat-title">Exam Blueprints</div>
                             <div className="stat-val" style={{ color: 'var(--purple)' }}>{stats.totalExams}</div>
@@ -212,7 +231,19 @@ export const AdminDashboardPage = () => {
             {activeTab === 'students' && <StudentTable onRefresh={loadStats} />}
             {activeTab === 'packages' && <PackageManager onRefresh={loadStats} />}
             {activeTab === 'payments' && <PaymentsPanel />}
-            {activeTab === 'questions' && <QuestionBankManager onRefresh={loadStats} />}
+            {activeTab === 'reported' && (
+                <ReportedQuestionsPanel
+                    onChanged={loadStats}
+                    onEditQuestion={(id) => { setFocusQuestionId(id); setActiveTab('questions'); }}
+                />
+            )}
+            {activeTab === 'questions' && (
+                <QuestionBankManager
+                    onRefresh={loadStats}
+                    focusQuestionId={focusQuestionId}
+                    onFocusHandled={() => setFocusQuestionId(null)}
+                />
+            )}
             {activeTab === 'subject_codes' && <SubjectCodeManager onRefresh={loadStats} />}
             {activeTab === 'exams' && <ExamConfigList />}
             {activeTab === 'free_tests' && <FreeTestManager onRefresh={loadStats} />}

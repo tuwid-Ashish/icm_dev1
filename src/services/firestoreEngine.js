@@ -893,6 +893,67 @@ export const firestoreEngine = {
         return data;
     },
 
+    // ---- Reported questions --------------------------------------------------
+
+    // A student flags a question that looks wrong. Goes through the server, which
+    // validates it and limits how many a student can send a day.
+    // Resolves { alreadyReported } on success; throws an Error with a plain message.
+    reportQuestion: async ({ questionId, reason, note, examId }) => {
+        const idToken = auth?.currentUser ? await auth.currentUser.getIdToken() : null;
+        if (!idToken) throw new Error('Please sign in again.');
+        let res, data;
+        try {
+            res = await fetch('/api/report-question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ questionId, reason, note, examId })
+            });
+            data = await res.json();
+        } catch {
+            throw new Error('Could not reach the server.');
+        }
+        if (res.status === 429) { const e = new Error(data?.error || 'Too many reports today.'); e.code = 'too-many'; throw e; }
+        if (!res.ok) throw new Error(data?.error || 'Could not send your report.');
+        return { alreadyReported: !!data.alreadyReported };
+    },
+
+    // The open reports — one read per report, and only reports that are still
+    // open, so the admin sees just the flagged questions, never the whole bank.
+    getOpenQuestionReports: async ({ max = 300 } = {}) => {
+        if (!isFirebaseConnected || !db) return [];
+        const snap = await getDocs(query(collection(db, 'question_reports'), where('status', '==', 'open'), limit(max)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+
+    countOpenQuestionReports: async () => {
+        if (!isFirebaseConnected || !db) return 0;
+        try {
+            const snap = await getCountFromServer(query(collection(db, 'question_reports'), where('status', '==', 'open')));
+            return snap.data().count;
+        } catch (err) {
+            console.error('[Firestore Engine] Could not count reported questions:', err.message);
+            return 0;
+        }
+    },
+
+    // Close every open report on a question. `resolution` is 'fixed' or 'no_issue'.
+    resolveQuestionReports: async (questionId, resolution) => {
+        if (!isFirebaseConnected || !db) throw new Error('Firestore database is not connected.');
+        const snap = await getDocs(query(collection(db, 'question_reports'), where('questionId', '==', questionId)));
+        const batch = writeBatch(db);
+        const now = new Date().toISOString();
+        const by = auth?.currentUser?.uid || null;
+        let closed = 0;
+        snap.docs.forEach(d => {
+            if (d.data().status === 'open') {
+                batch.update(d.ref, { status: 'resolved', resolution, resolvedAt: now, resolvedBy: by });
+                closed++;
+            }
+        });
+        if (closed) await batch.commit();
+        return closed;
+    },
+
     // Firestore usage today and for the last week, from the server (admin only).
     // Never throws: { available: false, message } explains what to switch on.
     adminGetUsage: async () => {

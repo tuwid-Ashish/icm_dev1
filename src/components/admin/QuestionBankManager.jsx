@@ -11,7 +11,7 @@ import { SubjectWiseCountWidget } from './SubjectWiseCountWidget.jsx';
 import { indexKey } from '../../utils/questionIndex.js';
 
 
-export const QuestionBankManager = ({ onRefresh }) => {
+export const QuestionBankManager = ({ onRefresh, focusQuestionId = null, onFocusHandled = null }) => {
     // Only the pages loaded so far — the bank is never loaded whole. Totals come
     // from the question index, and the list is fetched 50 at a time.
     const [questions, setQuestions] = useState([]);
@@ -129,6 +129,23 @@ export const QuestionBankManager = ({ onRefresh }) => {
     useEffect(() => {
         loadCounts();
     }, []);
+
+    // The Reported Questions tab hands over one question to fix: fetch just that
+    // one (a single read) and open it in the editor. The bank is not searched.
+    useEffect(() => {
+        if (!focusQuestionId) return;
+        (async () => {
+            const q = await firestoreEngine.getQuestionById(focusQuestionId);
+            if (q) {
+                setLookupResult(q);
+                setSearchQuery(q.id);
+                handleOpenEditModal(q);
+            } else {
+                setLookupMessage(`The reported question "${focusQuestionId}" no longer exists in the bank.`);
+            }
+            if (onFocusHandled) onFocusHandled();
+        })();
+    }, [focusQuestionId]);
 
     // Search only sees the questions loaded so far (the bank is not loaded whole),
     // so an exact Q.ID can be looked up anywhere in the bank with Enter.
